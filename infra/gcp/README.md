@@ -32,8 +32,14 @@ gcloud secrets versions add clerk-secret-key --data-file=-   # paste the key, th
 gcloud builds submit --config infra/gcp/cloudbuild.yaml --substitutions=_REGION=us-west1,SHORT_SHA=$(git rev-parse --short HEAD)
 ```
 
+## Live
+
+- Project `terraform-robotics` (us-west1), billing account "Terraform Robotics".
+- Web: https://web-131142126911.us-west1.run.app
+- The organization restricts IAM members to appliedalchemy.co; this project has an override (Domain restricted sharing: Allow All) so the services can be public.
+
 ## Before real users
 
-- **Authentication is Clerk.** Every API route except `/api/health` requires a valid Clerk session token, and users only see their own projects. Set `_WEB_ORIGIN` to the web service URL after the first deploy so the API also checks which site issued each token. The development Clerk instance is fine for testing; create a production instance in Clerk (with your own domain) before real users.
+- **Authentication is Clerk.** Every API route except `/api/health` requires a valid Clerk session token, and users only see their own projects. `_WEB_ORIGIN` in `cloudbuild.yaml` is the web service URL, so the API also checks which site issued each token. The development Clerk instance is fine for testing; create a production instance in Clerk (with your own domain) before real users.
 - Large LiDAR uploads should go straight to Cloud Storage via signed URLs rather than through the API (Cloud Run caps request bodies at 32 MiB). The current upload endpoint suits DEMs, contour files and small point clouds.
 - The worker's public-elevation fetch needs outbound access to USGS services (default on Cloud Run).
