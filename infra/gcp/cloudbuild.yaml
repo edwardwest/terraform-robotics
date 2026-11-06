@@ -8,6 +8,8 @@ substitutions:
   _CLERK_PUBLISHABLE_KEY: pk_test_YXJyaXZpbmctYmFzaWxpc2stNzE2OC5jbGVyay5hY2NvdW50cy5kZXYk
   _CLERK_JWKS_URL: https://arriving-basilisk-7168.clerk.accounts.dev/.well-known/jwks.json
   _WEB_ORIGIN: https://web-131142126911.us-west1.run.app  # the web app's public URL, for CLERK_AUTHORIZED_PARTIES
+options:
+  dynamicSubstitutions: true  # lets _BUCKET reference ${PROJECT_ID}
 images:
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/api:${SHORT_SHA}
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/worker:${SHORT_SHA}
