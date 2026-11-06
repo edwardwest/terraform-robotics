@@ -2,12 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { Feature, FeatureCollection, LineString, Point, Polygon } from "geojson";
 import type { GeoJSONSource, Marker } from "maplibre-gl";
-import type { FlowProps, KeypointProps, LayerName, Project, TerrainSummary } from "@/lib/api";
+import type { DesignCollection, FlowProps, KeypointProps, LayerName, Project, TerrainSummary } from "@/lib/api";
 import { ensureMaplibre, SATELLITE_TILES, setSatelliteVisible } from "@/lib/maplibre";
 import { useMap } from "@/lib/useMap";
 import { emptyFC, polygonFeature } from "@/lib/geo";
 import { IconMap, IconMinus, IconPlus, IconRotate3d, IconRuler } from "../Icons";
-import { analysisLayers, boundaryLayers, LAYER_IDS, sectionLayers, type ToggleKey } from "./layers";
+import { analysisLayers, boundaryLayers, DESIGN_CLICK_LAYERS, designLayers, LAYER_IDS, sectionLayers, type ToggleKey } from "./layers";
 import styles from "./TerrainMap.module.css";
 
 export type LayerData = Partial<Record<LayerName, FeatureCollection>>;
@@ -23,6 +23,16 @@ interface Props {
   onStartSection: () => void;
   selectedKeypoint: string | null;
   onSelectKeypoint: (id: string) => void;
+  /** Stage 2 design elements to draw over the terrain. */
+  design?: DesignCollection | null;
+  selectedElement?: string | null;
+  onSelectElement?: (id: string | null) => void;
+  /** When set, map clicks go to `onMapClick` (e.g. placing a swale) instead of selecting. */
+  mapClickActive?: boolean;
+  onMapClick?: (lngLat: [number, number]) => void;
+  pending?: [number, number][];
+  /** Label for the map's own section-drawing chip; hidden when false. */
+  showSectionTool?: boolean;
 }
 
 /** Mark the highest-order streams as main flow. */
@@ -50,6 +60,13 @@ export function TerrainMap({
   onStartSection,
   selectedKeypoint,
   onSelectKeypoint,
+  design = null,
+  selectedElement = null,
+  onSelectElement,
+  mapClickActive = false,
+  onMapClick,
+  pending = [],
+  showSectionTool = true,
 }: Props) {
   const { containerRef, map, error } = useMap();
   const [pitched, setPitched] = useState(false);
@@ -61,16 +78,26 @@ export function TerrainMap({
   onSectionClickRef.current = onSectionClick;
   const onSelectRef = useRef(onSelectKeypoint);
   onSelectRef.current = onSelectKeypoint;
+  const mapClickRef = useRef({ active: mapClickActive, fn: onMapClick, select: onSelectElement });
+  mapClickRef.current = { active: mapClickActive, fn: onMapClick, select: onSelectElement };
 
   // Sources and layers, added once.
   useEffect(() => {
     if (!map) return;
-    for (const id of ["boundary", "contours", "flow", "valleys", "ridges", "section"]) {
+    for (const id of ["boundary", "contours", "flow", "valleys", "ridges", "section", "design", "pending"]) {
       if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: emptyFC() });
     }
-    for (const l of [...analysisLayers, ...boundaryLayers, ...sectionLayers]) if (!map.getLayer(l.id)) map.addLayer(l);
-    const click = (e: { lngLat: { lng: number; lat: number } }) => {
-      if (sectionModeRef.current) onSectionClickRef.current([e.lngLat.lng, e.lngLat.lat]);
+    for (const l of [...analysisLayers, ...boundaryLayers, ...designLayers, ...sectionLayers]) if (!map.getLayer(l.id)) map.addLayer(l);
+    const click = (e: { lngLat: { lng: number; lat: number }; point: { x: number; y: number } }) => {
+      const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+      if (sectionModeRef.current) return onSectionClickRef.current(lngLat);
+      const m = mapClickRef.current;
+      if (m.active && m.fn) return m.fn(lngLat);
+      if (m.select) {
+        const { x, y } = e.point;
+        const hits = map.queryRenderedFeatures([[x - 4, y - 4], [x + 4, y + 4]], { layers: DESIGN_CLICK_LAYERS });
+        m.select(hits.length ? String(hits[0].properties?.id) : null);
+      }
     };
     map.on("click", click);
     return () => {
@@ -94,6 +121,25 @@ export function TerrainMap({
     }
     (map.getSource("flow") as GeoJSONSource | undefined)?.setData(data.flow ? tagMainFlow(data.flow) : emptyFC());
   }, [map, data.contours, data.flow, data.valleys, data.ridges]);
+
+  // Design elements; rip lines with notes are drawn a little brighter.
+  useEffect(() => {
+    if (!map) return;
+    const fc = design
+      ? { ...design, features: design.features.map((f) => ({ ...f, properties: { ...f.properties, _flag: !!f.properties.notes?.length } })) }
+      : emptyFC();
+    (map.getSource("design") as GeoJSONSource | undefined)?.setData(fc as FeatureCollection);
+  }, [map, design]);
+
+  useEffect(() => {
+    if (map?.getLayer("design-selected")) map.setFilter("design-selected", ["==", ["get", "id"], selectedElement ?? "__none__"]);
+  }, [map, selectedElement]);
+
+  useEffect(() => {
+    if (!map) return;
+    const features: Feature[] = pending.map((c) => ({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: c } }));
+    (map.getSource("pending") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features });
+  }, [map, pending]);
 
   // Keypoints as HTML markers (no glyph server needed for "K1" labels).
   useEffect(() => {
@@ -146,11 +192,16 @@ export function TerrainMap({
     };
   }, []);
 
-  // Optional raster-dem for hillshade and 3D terrain, only when the API provides a tiles URL.
+  // Elevation tiles drive hillshade and 3D terrain; slope classes are a separate raster.
   useEffect(() => {
     if (!map || !summary?.dem_tiles_url) return;
+    const bounds = summary.dem_bounds ?? undefined;
+    if (summary.slope_tiles_url && !map.getSource("slope")) {
+      map.addSource("slope", { type: "raster", tiles: [summary.slope_tiles_url], tileSize: 256, maxzoom: 17, bounds });
+      map.addLayer({ id: "slope", type: "raster", source: "slope", paint: { "raster-opacity": 0.8 } }, "contours-minor");
+    }
     if (!map.getSource("dem")) {
-      map.addSource("dem", { type: "raster-dem", tiles: [summary.dem_tiles_url], tileSize: 256, encoding: "terrarium" });
+      map.addSource("dem", { type: "raster-dem", tiles: [summary.dem_tiles_url], tileSize: 256, encoding: "terrarium", maxzoom: 16, bounds });
       map.addLayer(
         {
           id: "hillshade",
@@ -178,6 +229,10 @@ export function TerrainMap({
     }
   }, [map, visible, summary?.dem_tiles_url]);
 
+  useEffect(() => {
+    if (map) map.getCanvas().style.cursor = sectionMode || mapClickActive ? "crosshair" : "";
+  }, [map, sectionMode, mapClickActive]);
+
   // Section line.
   useEffect(() => {
     if (!map) return;
@@ -185,10 +240,6 @@ export function TerrainMap({
     if (section.length === 2) features.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: section } });
     (map.getSource("section") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features });
   }, [map, section]);
-
-  useEffect(() => {
-    if (map) map.getCanvas().style.cursor = sectionMode ? "crosshair" : "";
-  }, [map, sectionMode]);
 
   const toggle3d = () => {
     if (!map) return;
@@ -208,12 +259,14 @@ export function TerrainMap({
     <div className={styles.wrap}>
       <div ref={containerRef} className={styles.map} role="region" aria-label="Terrain map" />
       <div className={styles.topbar}>
-        <button type="button" className="chip" aria-pressed={sectionMode} onClick={onStartSection} disabled={!map}>
-          <IconRuler size={16} /> {sectionMode ? (section.length === 1 ? "Click the end point" : "Click the start point") : "Draw section"}
-        </button>
+        {showSectionTool && (
+          <button type="button" className="chip" aria-pressed={sectionMode} onClick={onStartSection} disabled={!map}>
+            <IconRuler size={16} /> {sectionMode ? (section.length === 1 ? "Click the end point" : "Click the start point") : "Draw section"}
+          </button>
+        )}
         {SATELLITE_TILES && (
           <button type="button" className="chip" aria-pressed={satellite} onClick={toggleSatellite} disabled={!map}>
-            <IconMap size={16} /> Basemap
+            <IconMap size={16} /> Aerial
           </button>
         )}
       </div>

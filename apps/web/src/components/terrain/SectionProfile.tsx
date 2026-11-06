@@ -14,6 +14,10 @@ export function SectionProfile({
   sectionMode,
   onStart,
   onClear,
+  eyebrow = "Section profile",
+  title,
+  emptyText = "Choose Draw section, then click a start and an end point on the map.",
+  showDraw = true,
 }: {
   profile: Profile | null;
   loading: boolean;
@@ -21,6 +25,10 @@ export function SectionProfile({
   sectionMode: boolean;
   onStart: () => void;
   onClear: () => void;
+  eyebrow?: string;
+  title?: string;
+  emptyText?: string;
+  showDraw?: boolean;
 }) {
   const titleId = useId();
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -98,11 +106,11 @@ export function SectionProfile({
     <section className={`card ${styles.card}`} aria-labelledby="section-title">
       <div className={styles.head}>
         <div>
-          <p className="app-eyebrow">Section profile</p>
+          <p className="app-eyebrow">{eyebrow}</p>
           <h2 id="section-title" className="app-h2">
-            {pts.length >= 2
+            {title ?? (pts.length >= 2
               ? `${Math.round(Math.max(...pts.map((p) => p[1])) - Math.min(...pts.map((p) => p[1])))} ft of relief across ${Math.round(pts[pts.length - 1][0]).toLocaleString()} ft.`
-              : "Cut a line across the land."}
+              : "Cut a line across the land.")}
           </h2>
         </div>
         <div className={styles.actions}>
@@ -111,9 +119,11 @@ export function SectionProfile({
               Clear
             </button>
           )}
-          <button type="button" className="btn btn-sm" aria-pressed={sectionMode} onClick={onStart}>
-            {sectionMode ? "Click two points on the map" : "Draw section"}
-          </button>
+          {showDraw && (
+            <button type="button" className="btn btn-sm" aria-pressed={sectionMode} onClick={onStart}>
+              {sectionMode ? "Click two points on the map" : "Draw section"}
+            </button>
+          )}
         </div>
       </div>
       <div ref={bodyRef} className={styles.body} aria-live="polite">
@@ -121,7 +131,7 @@ export function SectionProfile({
         {error && <p className="error-text" role="alert">{error}</p>}
         {chart}
         {!chart && !loading && !error && (
-          <p className="app-small">Choose Draw section, then click a start and an end point on the map.</p>
+          <p className="app-small">{emptyText}</p>
         )}
       </div>
     </section>

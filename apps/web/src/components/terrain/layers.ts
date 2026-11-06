@@ -1,10 +1,11 @@
 // Monochrome MapLibre layer definitions for the terrain analysis layers.
 import type { LayerSpecification } from "maplibre-gl";
 
-export type ToggleKey = "contours" | "flow" | "valleys" | "ridges" | "keypoints" | "hillshade";
+export type ToggleKey = "contours" | "flow" | "valleys" | "ridges" | "keypoints" | "hillshade" | "slope";
 
 export const LAYER_IDS: Record<Exclude<ToggleKey, "keypoints">, string[]> = {
   hillshade: ["hillshade"],
+  slope: ["slope"],
   contours: ["contours-minor", "contours-index"],
   valleys: ["valleys"],
   ridges: ["ridges"],
@@ -87,3 +88,74 @@ export const sectionLayers: LayerSpecification[] = [
     },
   },
 ];
+
+/** Stage 2 design elements. Drafts (planning-grade terrain) are dashed. */
+export const designLayers: LayerSpecification[] = [
+  {
+    id: "design-rip",
+    type: "line",
+    source: "design",
+    filter: ["==", ["get", "kind"], "rip"],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: {
+      "line-color": ["case", ["==", ["get", "_flag"], true], "rgba(255,255,255,0.95)", "rgba(255,255,255,0.6)"],
+      "line-width": ["case", ["==", ["get", "_flag"], true], 1.6, 1],
+    },
+  },
+  {
+    id: "design-swale-berm",
+    type: "line",
+    source: "design",
+    filter: ["==", ["get", "kind"], "swale"],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#000000", "line-width": 9 },
+  },
+  {
+    id: "design-swale",
+    type: "line",
+    source: "design",
+    filter: ["==", ["get", "kind"], "swale"],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#ffffff", "line-width": 5 },
+  },
+  {
+    id: "design-keyline-casing",
+    type: "line",
+    source: "design",
+    filter: ["==", ["get", "kind"], "keyline"],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#000000", "line-width": 7 },
+  },
+  {
+    id: "design-keyline",
+    type: "line",
+    source: "design",
+    filter: ["==", ["get", "kind"], "keyline"],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#ffffff", "line-width": 3.5 },
+  },
+  {
+    id: "design-selected",
+    type: "line",
+    source: "design",
+    filter: ["==", ["get", "id"], "__none__"],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#ffffff", "line-width": 6, "line-opacity": 0.9, "line-gap-width": 2 },
+  },
+  {
+    id: "pending-line",
+    type: "line",
+    source: "pending",
+    filter: ["==", ["geometry-type"], "LineString"],
+    paint: { "line-color": "#ffffff", "line-width": 2, "line-dasharray": [2, 2] },
+  },
+  {
+    id: "pending-points",
+    type: "circle",
+    source: "pending",
+    filter: ["==", ["geometry-type"], "Point"],
+    paint: { "circle-radius": 6, "circle-color": "#ffffff", "circle-stroke-color": "#000000", "circle-stroke-width": 2 },
+  },
+];
+
+export const DESIGN_CLICK_LAYERS = ["design-keyline", "design-rip", "design-swale"];

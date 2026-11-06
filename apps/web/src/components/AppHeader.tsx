@@ -8,14 +8,16 @@ const STEPS = [
   { n: 1, label: "Site", seg: "site" },
   { n: 2, label: "Survey", seg: "survey" },
   { n: 3, label: "Terrain", seg: "terrain" },
+  { n: 4, label: "Design", seg: "design" },
+  { n: 5, label: "Estimate", seg: "estimate" },
 ] as const;
 
 export function AppHeader() {
   const path = usePathname() || "/";
-  const m = path.match(/^\/projects\/([^/]+)\/(site|survey|terrain)/);
+  const m = path.match(/^\/projects\/([^/]+)\/(site|survey|terrain|design|estimate|export)/);
   const isNew = path === "/projects/new";
   const projectId = m && m[1] !== "new" ? m[1] : null;
-  const current = isNew ? "site" : m?.[2] ?? null;
+  const current = isNew ? "site" : m?.[2] === "export" ? "estimate" : m?.[2] ?? null;
   const showSteps = isNew || !!projectId;
 
   return (

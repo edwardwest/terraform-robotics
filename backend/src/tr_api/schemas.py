@@ -116,3 +116,118 @@ class TerrainSummary(BaseModel):
     quality: dict[str, float]
     layers: list[str]
     dem_url: str
+    dem_tiles_url: str | None = None
+    slope_tiles_url: str | None = None
+    dem_bounds: list[float] | None = None  # [west, south, east, north] of the terrain model
+
+
+# ---- Stage 2: design --------------------------------------------------------------------------
+
+LngLat = tuple[float, float]
+
+
+class KeylineCreate(BaseModel):
+    keypoint_id: str = Field(min_length=1, max_length=20)
+    grade: float = Field(default=1 / 300, gt=0, le=0.05, description="fall per metre along the line")
+    spacing_m: float = Field(default=5.0, ge=0.5, le=100)
+    extent: Literal["site", "valley"] = "site"
+    pattern: Literal["parallel", "graded", "none"] = "parallel"
+    max_lines: int = Field(default=300, ge=1, le=600)
+    allow_planning: bool = False
+
+
+class SwaleCreate(BaseModel):
+    start: LngLat
+    end: LngLat
+    width_m: float = Field(default=1.8, gt=0, le=20)
+    depth_m: float = Field(default=0.45, gt=0, le=5)
+    berm: bool = True
+    allow_planning: bool = False
+
+
+class DesignFeature(BaseModel):
+    type: Literal["Feature"]
+    geometry: dict[str, Any]
+    properties: dict[str, Any]
+
+
+class KeylineResult(BaseModel):
+    group_id: str
+    keyline: DesignFeature
+    rip_count: int
+    rip_length_m: float
+    area_treated_m2: float
+    terrain_grade: Literal["design", "planning"]
+    notes: list[str]
+
+
+# ---- Estimate ---------------------------------------------------------------------------------
+
+
+class CostItem(BaseModel):
+    item: str
+    label: str
+    unit: str
+    rate_low: float
+    rate_high: float
+    note: str | None = None
+    custom: bool = False
+
+
+class CostItemUpdate(BaseModel):
+    rate_low: float = Field(ge=0)
+    rate_high: float = Field(ge=0)
+
+    @field_validator("rate_high")
+    @classmethod
+    def ordered(cls, v, info):
+        low = info.data.get("rate_low")
+        if low is not None and v < low:
+            raise ValueError("rate_high must be at least rate_low")
+        return v
+
+
+class EstimateLine(BaseModel):
+    item: str
+    label: str
+    quantity: float
+    unit: str
+    rate_low: float
+    rate_high: float
+    total_low: float
+    total_high: float
+    basis: str
+
+
+class Estimate(BaseModel):
+    lines: list[EstimateLine]
+    build_low: float
+    build_high: float
+    design_fee_low: float
+    design_fee_high: float
+    contingency_pct: float
+    contingency_low: float
+    contingency_high: float
+    total_low: float
+    total_high: float
+    quantities: dict[str, float]
+    draft: bool
+    note: str
+
+
+# ---- Parcels and geocoding ----------------------------------------------------------------------
+
+
+class GeocodeResult(BaseModel):
+    label: str
+    lng: float
+    lat: float
+    source: str
+
+
+class Parcel(BaseModel):
+    apn: str | None
+    address: str | None
+    acres: float | None
+    boundary: dict[str, Any]
+    source: str

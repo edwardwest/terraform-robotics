@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Polygon } from "geojson";
-import { api, type BoundarySource } from "@/lib/api";
+import { api, type BoundarySource, type GeocodeResult, type Parcel } from "@/lib/api";
 import { extractPolygon, polygonAreaM2, polygonPerimeterM } from "@/lib/geo";
 import { formatAcres, formatMiles } from "@/lib/units";
 import { IconArrowRight, IconUpload } from "../Icons";
@@ -39,6 +39,13 @@ export function SiteSetup({ projectId }: { projectId: string | null }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!projectId);
   const [flyTo, setFlyTo] = useState<{ center: [number, number]; zoom: number } | null>(null);
+  const [candidates, setCandidates] = useState<GeocodeResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [pin, setPin] = useState<[number, number] | null>(null);
+  const [parcel, setParcel] = useState<Parcel | null>(null);
+  const [parcelBusy, setParcelBusy] = useState(false);
+  const [parcelError, setParcelError] = useState<string | null>(null);
   const loadedBoundary = useRef<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -51,7 +58,7 @@ export function SiteSetup({ projectId }: { projectId: string | null }) {
         setAddress(p.address ?? "");
         setBoundary(p.boundary);
         loadedBoundary.current = JSON.stringify(p.boundary);
-        setSource(p.boundary_source === "upload" ? "upload" : "drawn");
+        setSource(p.boundary_source === "upload" ? "upload" : p.boundary_source === "parcel" ? "parcel" : "drawn");
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -73,9 +80,47 @@ export function SiteSetup({ projectId }: { projectId: string | null }) {
     }
   };
 
-  const findAddress = () => {
+  const goTo = (c: [number, number]) => {
+    setPin(c);
+    setFlyTo({ center: c, zoom: 16 });
+  };
+
+  const findAddress = async () => {
+    setSearchError(null);
     const c = parseCoords(address);
-    if (c) setFlyTo({ center: c, zoom: 16 });
+    if (c) {
+      setCandidates(null);
+      goTo(c);
+      return;
+    }
+    if (address.trim().length < 3) return;
+    setSearching(true);
+    try {
+      const results = await api.geocode(address.trim());
+      setCandidates(results);
+      if (results.length === 1) goTo([results[0].lng, results[0].lat]);
+      if (!results.length) setSearchError("No match. Try the street address with city, or type latitude, longitude.");
+    } catch (e) {
+      setSearchError((e as Error).message);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const importParcel = async () => {
+    if (!pin) return;
+    setParcelBusy(true);
+    setParcelError(null);
+    try {
+      const p = await api.parcelAt(pin[0], pin[1]);
+      setParcel(p);
+      setBoundary(p.boundary);
+      if (!address.trim() && p.address) setAddress(p.address);
+    } catch (e) {
+      setParcelError((e as Error).message);
+    } finally {
+      setParcelBusy(false);
+    }
   };
 
   const canContinue = !!boundary && name.trim().length > 0 && !saving;
@@ -106,7 +151,7 @@ export function SiteSetup({ projectId }: { projectId: string | null }) {
     <div className={styles.layout}>
       <form className={styles.left} onSubmit={submit} aria-busy={loading || saving}>
         <div className={styles.intro}>
-          <p className="app-eyebrow">{projectId ? "Project" : "New project"} · Step 1 of 3</p>
+          <p className="app-eyebrow">{projectId ? "Project" : "New project"} · Step 1 of 5</p>
           <h1 className="app-display">Start with the land.</h1>
           <p className="app-body">
             Name the property and set its boundary. Everything that follows, from contours to keylines, is measured
@@ -141,7 +186,7 @@ export function SiteSetup({ projectId }: { projectId: string | null }) {
                     findAddress();
                   }
                 }}
-                placeholder="123 Ridge Rd, or 38.40, -122.80"
+                placeholder="700 Freestone Ranch Rd, Sebastopol"
                 autoComplete="street-address"
                 aria-describedby="address-help"
               />
@@ -149,28 +194,59 @@ export function SiteSetup({ projectId }: { projectId: string | null }) {
                 type="button"
                 className="btn btn-sm"
                 onClick={findAddress}
-                disabled={!parseCoords(address)}
+                disabled={searching || address.trim().length < 3}
               >
-                Go
+                {searching ? "Finding." : "Find"}
               </button>
             </div>
             <p id="address-help" className="app-small">
-              Type latitude, longitude to move the map. Street search arrives with the parcel provider.
+              Street address, or latitude, longitude. Search uses the US Census geocoder and county records.
             </p>
+            {searchError && <p className="error-text" role="alert">{searchError}</p>}
+            {candidates && candidates.length > 1 && (
+              <ul className={styles.results} aria-label="Address matches">
+                {candidates.map((c) => (
+                  <li key={`${c.lng},${c.lat}`}>
+                    <button
+                      type="button"
+                      className={`${styles.result} ${pin && pin[0] === c.lng && pin[1] === c.lat ? styles.resultOn : ""}`}
+                      onClick={() => goTo([c.lng, c.lat])}
+                    >
+                      <span>{c.label}</span>
+                      <span className="app-small">{c.source}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 
         <fieldset className={styles.sources}>
           <legend className="field-label">Boundary source</legend>
 
-          <label className={`${styles.radioRow} ${styles.disabledRow}`}>
-            <input type="radio" name="source" value="parcel" disabled />
+          <label className={`${styles.radioRow} ${source === "parcel" ? styles.checked : ""}`}>
+            <input type="radio" name="source" value="parcel" checked={source === "parcel"} onChange={() => setSource("parcel")} />
             <span className={styles.radioText}>
               <span className="app-title">Import county parcel</span>
-              <span className="app-small">Pull the recorded parcel line for this address.</span>
+              <span className="app-small">The recorded parcel line at the address you found. Sonoma County for now.</span>
             </span>
-            <span className={styles.badge}>Coming soon</span>
           </label>
+          {source === "parcel" && (
+            <div className={styles.upload}>
+              <button type="button" className="btn btn-sm" onClick={importParcel} disabled={!pin || parcelBusy}>
+                {parcelBusy ? "Fetching parcel." : "Import parcel"}
+              </button>
+              <span className="app-small" aria-live="polite">
+                {parcel
+                  ? `APN ${parcel.apn ?? "—"}${parcel.acres ? ` · ${parcel.acres} recorded acres` : ""}`
+                  : pin
+                    ? "Uses the location you found."
+                    : "Find the address first."}
+              </span>
+              {parcelError && <p className="error-text" role="alert">{parcelError}</p>}
+            </div>
+          )}
 
           <label className={`${styles.radioRow} ${source === "upload" ? styles.checked : ""}`}>
             <input

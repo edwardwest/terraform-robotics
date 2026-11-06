@@ -1,0 +1,144 @@
+.tabs,
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.group legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.check,
+.draft {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.draft {
+  padding: var(--space-2);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-strong);
+}
+
+.draft > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.draft input,
+.check input {
+  margin-top: 3px;
+  accent-color: var(--white);
+}
+
+.gradeCard {
+  border: 1px solid var(--border-strong);
+}
+
+.notes {
+  margin: var(--space-2) 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.elements {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.element {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+}
+
+.elementSelected {
+  border-color: var(--border-strong);
+  background: var(--surface-card);
+}
+
+.elementMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.elementLabel {
+  font-weight: 700;
+  color: var(--fg-1);
+}
+
+.detail {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.detailList {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.detailList dd {
+  margin: 2px 0 0;
+  color: var(--fg-1);
+}
+
+.note {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.disabledLink {
+  pointer-events: none;
+  opacity: 0.45;
+}

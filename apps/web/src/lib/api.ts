@@ -60,9 +60,112 @@ export interface TerrainSummary {
   quality: { design_pct: number; planning_pct: number; coarse_pct: number };
   layers: LayerName[];
   dem_url: string | null;
-  /** Optional: XYZ terrain-RGB tiles for MapLibre raster-dem. Not in the Stage 1 contract yet. */
+  /** Terrarium-encoded elevation tiles for MapLibre raster-dem (hillshade and 3D). */
   dem_tiles_url?: string | null;
+  /** Slope classes as white-with-opacity tiles. */
+  slope_tiles_url?: string | null;
+  /** [west, south, east, north] of the terrain model. */
+  dem_bounds?: [number, number, number, number] | null;
 }
+
+// ---- Stage 2: design, estimate, export ----------------------------------------------------------
+
+export type DesignKind = "keyline" | "rip" | "swale";
+
+export interface DesignProps {
+  id: string;
+  kind: DesignKind;
+  label: string;
+  group_id: string | null;
+  length_m: number;
+  draft?: boolean;
+  notes?: string[];
+  keypoint_id?: string;
+  pass?: number;
+  position?: "above" | "below";
+  fall_to_ridges_min?: number | null;
+  steepest_grade?: number | null;
+  elevation_m?: number;
+  width_m?: number;
+  depth_m?: number;
+  cut_volume_m3?: number;
+  storage_gal?: number;
+  catchment_m2?: number;
+  terrain_slope_max_pct?: number;
+  [k: string]: unknown;
+}
+
+export type DesignFeature = Feature<LineString, DesignProps>;
+export type DesignCollection = FeatureCollection<LineString, DesignProps>;
+
+export interface KeylineRequest {
+  keypoint_id: string;
+  grade: number;
+  spacing_m: number;
+  extent: "site" | "valley";
+  pattern: "parallel" | "graded" | "none";
+  allow_planning: boolean;
+}
+
+export interface KeylineResult {
+  group_id: string;
+  keyline: DesignFeature;
+  rip_count: number;
+  rip_length_m: number;
+  area_treated_m2: number;
+  terrain_grade: "design" | "planning";
+  notes: string[];
+}
+
+export interface SwaleRequest {
+  start: [number, number];
+  end: [number, number];
+  width_m: number;
+  depth_m: number;
+  berm: boolean;
+  allow_planning: boolean;
+}
+
+export interface CostItem {
+  item: string;
+  label: string;
+  unit: string;
+  rate_low: number;
+  rate_high: number;
+  note: string | null;
+  custom: boolean;
+}
+
+export interface EstimateLine {
+  item: string;
+  label: string;
+  quantity: number;
+  unit: string;
+  rate_low: number;
+  rate_high: number;
+  total_low: number;
+  total_high: number;
+  basis: string;
+}
+
+export interface Estimate {
+  lines: EstimateLine[];
+  build_low: number;
+  build_high: number;
+  design_fee_low: number;
+  design_fee_high: number;
+  contingency_pct: number;
+  contingency_low: number;
+  contingency_high: number;
+  total_low: number;
+  total_high: number;
+  quantities: Record<string, number>;
+  draft: boolean;
+  note: string;
+}
+
+export interface GeocodeResult { label: string; lng: number; lat: number; source: string }
+export interface Parcel { apn: string | null; address: string | null; acres: number | null; boundary: Polygon; source: string }
 
 export interface ContourProps { elevation_m: number; index: boolean }
 export interface FlowProps { accumulation: number; order: number }
@@ -154,6 +257,37 @@ export const api = {
     const c = coords.map(([lng, lat]) => `${lng.toFixed(7)},${lat.toFixed(7)}`).join(";");
     return request<Profile>(`/projects/${id}/profile?coords=${encodeURIComponent(c)}&samples=${samples}`);
   },
+
+  getDesign: (id: string) => request<DesignCollection>(`/projects/${id}/design`),
+  createKeyline: (id: string, body: KeylineRequest) =>
+    request<KeylineResult>(`/projects/${id}/design/keylines`, { method: "POST", body: json(body) }),
+  createSwale: (id: string, body: SwaleRequest) =>
+    request<DesignFeature>(`/projects/${id}/design/swales`, { method: "POST", body: json(body) }),
+  deleteElement: (id: string, elementId: string) =>
+    request<void>(`/projects/${id}/design/elements/${elementId}`, { method: "DELETE" }),
+  elementProfile: (id: string, elementId: string) =>
+    request<Profile>(`/projects/${id}/design/elements/${elementId}/profile`),
+
+  getEstimate: (id: string, contingencyPct = 15) =>
+    request<Estimate>(`/projects/${id}/estimate?contingency_pct=${contingencyPct}`),
+  listCostItems: () => request<CostItem[]>("/cost-items"),
+  updateCostItem: (item: string, rate_low: number, rate_high: number) =>
+    request<CostItem>(`/cost-items/${encodeURIComponent(item)}`, { method: "PUT", body: json({ rate_low, rate_high }) }),
+  resetCostItem: (item: string) => request<void>(`/cost-items/${encodeURIComponent(item)}`, { method: "DELETE" }),
+
+  geocode: (q: string) => request<GeocodeResult[]>(`/geocode?q=${encodeURIComponent(q)}`),
+  parcelAt: (lng: number, lat: number) => request<Parcel>(`/parcels/at?lng=${lng}&lat=${lat}`),
+};
+
+/** Download links (same-origin, so the session cookie rides along through the proxy). */
+export const exportUrl = {
+  estimateXlsx: (id: string, pct = 15) => `${BASE}/projects/${id}/estimate.xlsx?contingency_pct=${pct}`,
+  pdf: (id: string, pct = 15) => `${BASE}/projects/${id}/export/plan.pdf?contingency_pct=${pct}`,
+  geojson: (id: string) => `${BASE}/projects/${id}/export/geojson`,
+  shapefile: (id: string) => `${BASE}/projects/${id}/export/shapefile`,
+  kml: (id: string) => `${BASE}/projects/${id}/export/kml`,
+  dxf: (id: string) => `${BASE}/projects/${id}/export/dxf`,
+  guidance: (id: string, format: "geojson" | "shapefile") => `${BASE}/projects/${id}/export/guidance?format=${format}`,
 };
 
 /** Remember the active terrain job per project across the survey -> terrain navigation. */

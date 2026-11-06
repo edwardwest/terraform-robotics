@@ -90,3 +90,47 @@ Every endpoint except `GET /api/health` requires `Authorization: Bearer <Clerk s
 
 ## Errors
 `{ "detail": "message" }` with 4xx/5xx status.
+
+## Map tiles
+
+`TerrainSummary` also carries `dem_tiles_url` and `slope_tiles_url` (XYZ templates) and `dem_bounds` ([west, south, east, north]).
+
+`GET /api/projects/{id}/tiles/dem/{z}/{x}/{y}.png`: Terrarium-encoded elevation (elevation = R×256 + G + B/256 − 32768) for MapLibre `raster-dem` (hillshade, 3D). Nodata inside a tile is filled from the nearest valid cell; tiles outside the model are empty.
+
+`GET /api/projects/{id}/tiles/slope/{z}/{x}/{y}.png`: slope classes (<5, 5–15, 15–25, 25–35, >35 %) as white with rising opacity.
+
+## Design (Stage 2)
+
+Lines are computed by `tr_geo.design` from the terrain model. Designs on planning-grade terrain need `allow_planning: true` and are marked `draft`; coarse terrain is refused (`409`).
+
+`POST /api/projects/{id}/design/keylines`
+```json
+{ "keypoint_id": "K1", "grade": 0.00333, "spacing_m": 5, "extent": "site" | "valley", "pattern": "parallel" | "graded" | "none", "max_lines": 300, "allow_planning": false }
+```
+→ `{ group_id, keyline: Feature, rip_count, rip_length_m, area_treated_m2, terrain_grade, notes[] }`. Regenerating for the same keypoint replaces its pattern. The keyline falls at `grade` from the keypoint toward the ridges on both sides; arms stop at ridges, other valleys or the boundary. `parallel` offsets the keyline (Yeomans pattern); `graded` traces each line at `grade` from seeds along the keypoint's valley. `extent: valley` keeps parallel lines between the ridges of that valley.
+
+`POST /api/projects/{id}/design/swales` with `{ "start": [lng, lat], "end": [lng, lat], "width_m": 1.8, "depth_m": 0.45, "berm": true, "allow_planning": false }` → Feature. The swale is the contour through `start`, ending at the point nearest `end`.
+
+`GET /api/projects/{id}/design` → FeatureCollection of LineStrings. Properties: `id, kind (keyline|rip|swale), label, group_id, length_m, draft, notes[]`, plus per kind: rip `pass, position, fall_to_ridges_min, steepest_grade, z_start_m, z_end_m`; swale `elevation_m, width_m, depth_m, cross_section_m2, cut_volume_m3, storage_gal, catchment_m2, terrain_slope_mean_pct, terrain_slope_max_pct`.
+
+`DELETE /api/projects/{id}/design/elements/{element_id}` → `204` (deleting a keyline removes its rip pattern).
+
+`GET /api/projects/{id}/design/elements/{element_id}/profile` → `Profile`.
+
+## Estimate (W6)
+
+`GET /api/projects/{id}/estimate?contingency_pct=15` → `{ lines[{item,label,quantity,unit,rate_low,rate_high,total_low,total_high,basis}], build_low/high, design_fee_low/high, contingency_pct, contingency_low/high, total_low/high, quantities{}, draft, note }`. Quantities come from the design; rates from the cost library.
+
+`GET /api/cost-items` → the user's effective unit costs (starter rows merged with their own). `PUT /api/cost-items/{item}` with `{ rate_low, rate_high }` saves the user's own rate; `DELETE` resets it.
+
+`GET /api/projects/{id}/estimate.xlsx` → spreadsheet with live formulas.
+
+## Exports (W7)
+
+All return a file download: `GET /api/projects/{id}/export/geojson`, `/export/shapefile` (zip: design_lines, boundary, keypoints; WGS84), `/export/kml`, `/export/dxf` (UTM metres; layers BOUNDARY, KEYLINE, RIP, SWALE, BERM, CONTOUR, CONTOUR_INDEX, KEYPOINT), `/export/guidance?format=geojson|shapefile` (rip passes ordered top to bottom, alternating direction), `/export/plan.pdf?contingency_pct=15` (11×17 plan set).
+
+## Address and parcels
+
+`GET /api/geocode?q=...` → `[{label, lng, lat, source}]` (US Census geocoder, county address records, then OpenStreetMap Nominatim).
+
+`GET /api/parcels/at?lng=&lat=` → `{ apn, address, acres, boundary: Polygon, source }` from a county parcel service (`404` where none covers the point). `GET /api/parcels/coverage` lists the counties.

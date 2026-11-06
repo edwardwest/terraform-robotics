@@ -33,6 +33,7 @@ const LAYER_TOGGLES: { key: ToggleKey; label: string; swatch: string }[] = [
   { key: "ridges", label: "Ridges", swatch: "ridges" },
   { key: "keypoints", label: "Keypoints", swatch: "keypoints" },
   { key: "hillshade", label: "Hillshade", swatch: "hillshade" },
+  { key: "slope", label: "Slope", swatch: "slope" },
 ];
 
 const DIRECTION_WORDS: Record<string, string> = {
@@ -56,7 +57,7 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
   const [data, setData] = useState<LayerData>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [visible, setVisible] = useState<Record<ToggleKey, boolean>>({
-    contours: true, flow: true, valleys: true, ridges: true, keypoints: true, hillshade: true,
+    contours: true, flow: true, valleys: true, ridges: true, keypoints: true, hillshade: true, slope: false,
   });
   const [sectionMode, setSectionMode] = useState(false);
   const [section, setSection] = useState<[number, number][]>([]);
@@ -183,7 +184,7 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
       <aside className={styles.left} aria-label="Layers">
         <div className={styles.intro}>
           <p className="app-eyebrow">
-            {project ? `${project.name} · ${formatAcres(project.area_m2)} acres · ` : ""}Step 3 of 3
+            {project ? `${project.name} · ${formatAcres(project.area_m2)} acres · ` : ""}Step 3 of 5
           </p>
           <h1 className="app-display">Where the water goes.</h1>
           <p className="app-body">
@@ -195,7 +196,7 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
         <fieldset className={styles.layers}>
           <legend className="field-label">Layers</legend>
           {LAYER_TOGGLES.map((l) => {
-            const disabled = l.key === "hillshade" && !hasHillshade;
+            const disabled = (l.key === "hillshade" || l.key === "slope") && !hasHillshade;
             return (
               <label key={l.key} className={`${styles.layerRow} ${disabled ? styles.layerDisabled : ""}`}>
                 <input
@@ -206,7 +207,7 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
                 />
                 <span className={`${styles.swatch} ${styles[`sw_${l.swatch}`]}`} aria-hidden="true" />
                 <span className={styles.layerLabel}>{l.label}</span>
-                {disabled && <span className="app-small">Needs DEM tiles.</span>}
+                {disabled && <span className="app-small">After the terrain model.</span>}
               </label>
             );
           })}
@@ -223,6 +224,19 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
             <li><span className={`${styles.swatch} ${styles.sw_contours}`} aria-hidden="true" /> Contour</li>
             <li><span className={`${styles.swatch} ${styles.sw_keypoints}`} aria-hidden="true" /> Keypoint</li>
           </ul>
+          {visible.slope && hasHillshade && (
+            <div className={styles.slopeLegend} aria-label="Slope classes">
+              <p className="field-label">Slope</p>
+              <ul>
+                {[["Under 5%", 0], ["5–15%", 0.16], ["15–25%", 0.31], ["25–35%", 0.51], ["Over 35%", 0.75]].map(([label, a]) => (
+                  <li key={label as string}>
+                    <span className={styles.slopeSwatch} style={{ background: `rgba(255,255,255,${a})` }} aria-hidden="true" />
+                    {label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -233,7 +247,7 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
             project={project}
             summary={summary}
             data={data}
-            visible={{ ...visible, hillshade: visible.hillshade && hasHillshade }}
+            visible={{ ...visible, hillshade: visible.hillshade && hasHillshade, slope: visible.slope && hasHillshade }}
             sectionMode={sectionMode}
             section={section}
             onSectionClick={onSectionClick}
@@ -377,10 +391,18 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
         )}
 
         <div className={styles.next}>
-          <button type="button" className="btn btn-primary" disabled aria-describedby="stage2-note">
-            Design keylines <IconArrowRight />
-          </button>
-          <p id="stage2-note" className="app-small">Keyline design is Stage 2.</p>
+          {summary ? (
+            <Link href={`/projects/${projectId}/design`} className="btn btn-primary">
+              Design keylines <IconArrowRight />
+            </Link>
+          ) : (
+            <button type="button" className="btn btn-primary" disabled>
+              Design keylines <IconArrowRight />
+            </button>
+          )}
+          {summary && keypoints.length > 0 && confirmedCount === 0 && (
+            <p className="app-small">Confirm the keypoints you trust; the design step starts from them.</p>
+          )}
         </div>
       </aside>
     </div>

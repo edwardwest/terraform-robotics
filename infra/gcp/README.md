@@ -26,6 +26,14 @@ Then add the Clerk secret key (never commit it):
 gcloud secrets versions add clerk-secret-key --data-file=-   # paste the key, then Ctrl-D
 ```
 
+## Schema changes
+
+When `backend/sql` gains a file, apply it without touching the password:
+
+```bash
+infra/gcp/migrate.sh terraform-robotics us-west1
+```
+
 ## Deploy
 
 ```bash

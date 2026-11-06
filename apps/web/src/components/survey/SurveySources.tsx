@@ -160,7 +160,7 @@ export function SurveySources({ projectId }: { projectId: string }) {
       <div className={styles.main}>
         <header className={styles.intro}>
           <p className="app-eyebrow">
-            {project ? `${project.name} · ${formatAcres(project.area_m2)} acres · ` : ""}Step 2 of 3
+            {project ? `${project.name} · ${formatAcres(project.area_m2)} acres · ` : ""}Step 2 of 5
           </p>
           <h1 className="app-display">Bring the best ground data you have.</h1>
           <p className="app-body">

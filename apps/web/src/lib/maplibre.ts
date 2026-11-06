@@ -12,7 +12,11 @@ export function ensureMaplibre() {
   return maplibregl;
 }
 
-export const SATELLITE_TILES = process.env.NEXT_PUBLIC_SATELLITE_TILES || "";
+/** Aerial basemap. Default: USGS National Map imagery (public domain, US coverage). */
+export const SATELLITE_TILES =
+  process.env.NEXT_PUBLIC_SATELLITE_TILES ||
+  "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}";
+export const SATELLITE_ATTRIBUTION = process.env.NEXT_PUBLIC_SATELLITE_TILES ? "" : "Imagery: USGS The National Map";
 
 /** Default style: black background only. No third-party tiles, no glyph server. */
 export function baseStyle(): StyleSpecification {
@@ -22,7 +26,13 @@ export function baseStyle(): StyleSpecification {
     layers: [{ id: "background", type: "background", paint: { "background-color": "#000000" } }],
   };
   if (SATELLITE_TILES) {
-    style.sources.satellite = { type: "raster", tiles: [SATELLITE_TILES], tileSize: 256, maxzoom: 20 };
+    style.sources.satellite = {
+      type: "raster",
+      tiles: [SATELLITE_TILES],
+      tileSize: 256,
+      maxzoom: 16,
+      attribution: SATELLITE_ATTRIBUTION || undefined,
+    };
     style.layers.push({
       id: "satellite",
       type: "raster",

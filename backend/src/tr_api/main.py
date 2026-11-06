@@ -21,8 +21,15 @@ from .auth import CurrentUser
 from .db import execute, fetch_all, fetch_one
 from .jobs import dispatch_terrain_job
 from .storage import get_storage
+from .common import JOB_COLUMNS, PROJECT_SELECT, SURVEY_COLUMNS, _project_or_404, load_dem as _load_dem
 
 app = FastAPI(title="Terraform Robotics API", version="0.1.0")
+from . import design_api, outputs, parcels, tiles  # noqa: E402
+
+app.include_router(design_api.router)
+app.include_router(outputs.router)
+app.include_router(tiles.router)
+app.include_router(parcels.router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(","),
@@ -36,30 +43,6 @@ UPLOAD_EXTENSIONS = {
     "dem": {".tif", ".tiff"},
     "contours": {".geojson", ".json"},
 }
-
-PROJECT_SELECT = """
-SELECT id, name, address, boundary_source, created_at,
-       ST_AsGeoJSON(boundary)::json AS boundary,
-       ST_Area(boundary::geography) AS area_m2,
-       ST_Perimeter(boundary::geography) AS perimeter_m,
-       CASE WHEN boundary IS NULL THEN NULL
-            ELSE ARRAY[ST_X(ST_Centroid(boundary)), ST_Y(ST_Centroid(boundary))] END AS centroid,
-       CASE WHEN boundary IS NULL THEN NULL
-            ELSE ARRAY[ST_XMin(boundary), ST_YMin(boundary), ST_XMax(boundary), ST_YMax(boundary)] END AS bbox
-FROM projects
-"""
-
-SURVEY_COLUMNS = "id, project_id, kind, filename, status, resolution_m, grade, error, created_at"
-JOB_COLUMNS = "id, project_id, kind, status, step, step_index, step_count, error, created_at, finished_at"
-
-
-def _project_or_404(project_id: UUID, user: dict) -> dict:
-    """The project if the user owns it. Someone else's project is reported as not found."""
-    row = fetch_one(PROJECT_SELECT + " WHERE id = :id AND owner_id = :uid", id=str(project_id), uid=str(user["id"]))
-    if not row:
-        raise HTTPException(404, "Project not found")
-    return row
-
 
 @app.get("/api/health")
 def health():
@@ -219,7 +202,17 @@ def get_terrain(project_id: UUID, user: CurrentUser):
         "outlet": {"type": "Point", "coordinates": s["outlet_lnglat"]},
         "layers": list(LAYERS),
         "dem_url": f"/files/{row['dem_path']}",
+        "dem_tiles_url": f"/api/projects/{project_id}/tiles/dem/{{z}}/{{x}}/{{y}}.png",
+        "slope_tiles_url": f"/api/projects/{project_id}/tiles/slope/{{z}}/{{x}}/{{y}}.png",
+        "dem_bounds": _dem_bounds(row["dem_path"]),
     }
+
+
+def _dem_bounds(dem_path: str) -> list[float] | None:
+    try:
+        return tiles.dem_bounds_lnglat(get_storage().local_path(dem_path))
+    except Exception:  # bounds are a hint for the map; never fail the summary over them
+        return None
 
 
 @app.get("/api/projects/{project_id}/layers/{layer}")
@@ -257,11 +250,6 @@ def update_keypoint(project_id: UUID, kp_id: str, body: schemas.KeypointUpdate, 
     if not row:
         raise HTTPException(404, "Keypoint not found")
     return row["feature"]
-
-
-@lru_cache(maxsize=16)
-def _load_dem(path: str):
-    return read_geotiff(path)
 
 
 @app.get("/api/projects/{project_id}/profile", response_model=schemas.Profile)
