@@ -1,0 +1,370 @@
+.layout {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--gutter) var(--space-6);
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.left,
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.left {
+  gap: var(--space-4);
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.intro :global(.app-display) {
+  font-size: 34px;
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.mapBox {
+  height: min(68vh, 760px);
+  min-height: 420px;
+}
+
+.mapLoading {
+  width: 100%;
+  height: 100%;
+  border-radius: 24px;
+  background: var(--ink-200);
+}
+
+/* Layers */
+.layers {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.layers legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+}
+
+.layerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: border-color var(--fade);
+}
+
+.layerRow:hover:not(.layerDisabled) {
+  border-color: var(--border-strong);
+}
+
+.layerRow input {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 1.5px solid var(--stone-400);
+  display: grid;
+  place-items: center;
+  cursor: inherit;
+}
+
+.layerRow input:checked {
+  background: var(--white);
+  border-color: var(--white);
+}
+
+.layerRow input:checked::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid #000;
+  border-bottom: 2px solid #000;
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.layerLabel {
+  flex: 1;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.layerDisabled {
+  cursor: not-allowed;
+}
+
+.layerDisabled .layerLabel,
+.layerDisabled input {
+  color: var(--fg-faint);
+  border-color: var(--fg-faint);
+}
+
+/* Legend swatches (24x12 line samples) */
+.legend ul {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 13px;
+  color: var(--fg-2);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.swatch {
+  width: 24px;
+  height: 12px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.swatch::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+}
+
+.sw_flow::after {
+  border-top: 2.5px solid #fff;
+  margin-top: -1.25px;
+}
+
+.sw_flowMinor::after {
+  border-top: 1.25px solid rgba(255, 255, 255, 0.45);
+}
+
+.sw_valleys::after {
+  height: 1.5px;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.7) 0 6px, transparent 6px 10px);
+}
+
+.sw_ridges::after {
+  border-top: 2px dotted rgba(255, 255, 255, 0.7);
+}
+
+.sw_contours::after {
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.sw_contoursIndex::after {
+  border-top: 1.25px solid rgba(255, 255, 255, 0.26);
+}
+
+.sw_keypoints::after {
+  left: 6px;
+  right: auto;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: 1px;
+  background: #000;
+  border: 1.5px solid #fff;
+  transform: rotate(45deg);
+}
+
+.sw_hillshade {
+  border-radius: 3px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(0, 0, 0, 0.6));
+  border: 1px solid var(--border-subtle);
+}
+
+/* Right panels */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.panel :global(.app-eyebrow) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.errorPanel {
+  border-color: var(--border-strong);
+}
+
+.errorPanel a {
+  align-self: flex-start;
+}
+
+.stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-2);
+}
+
+.stats dd {
+  margin: 4px 0 0;
+}
+
+.statWide {
+  grid-column: 1 / -1;
+}
+
+.sub {
+  display: block;
+  margin-top: 2px;
+}
+
+.num {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.kpList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.kpRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: 4px 4px 4px 0;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  transition: border-color var(--fade);
+}
+
+.kpSelected {
+  border-color: var(--border-strong);
+}
+
+.kpSelect {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch);
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+
+.kpDiamond {
+  width: 12px;
+  height: 12px;
+  margin: 0 4px;
+  background: #000;
+  border: 2px solid #fff;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
+.kpDiamond[data-confirmed="true"] {
+  background: #fff;
+}
+
+.kpText {
+  display: flex;
+  flex-direction: column;
+}
+
+.kpId {
+  font-weight: 700;
+}
+
+.confirmed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: var(--space-1);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg-2);
+}
+
+.next {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+}
+
+@media (max-width: 1280px) {
+  .layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  .right {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    align-items: start;
+  }
+}
+
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: 1fr;
+    padding: var(--space-3) 16px var(--space-5);
+  }
+  .left {
+    order: 0;
+  }
+  .center {
+    order: 1;
+  }
+  .right {
+    order: 2;
+    grid-template-columns: 1fr;
+  }
+  .layers {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .layers legend {
+    grid-column: 1 / -1;
+  }
+  .mapBox {
+    height: 60vh;
+    min-height: 360px;
+  }
+}

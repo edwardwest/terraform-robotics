@@ -4,6 +4,8 @@ Site survey to regenerative design. Terraform Robotics turns ground data (drone 
 
 This repository holds **Stage 1: site to terrain**.
 
+![Terrain and water screen: contours, valleys and two keypoints on a test site](docs/screenshots/stage1-terrain.png)
+
 | Step | What the user does | Built by |
 | --- | --- | --- |
 | 1. Site | Names the project and sets the parcel boundary (draw or upload GeoJSON) | `apps/web`, `tr_api` |

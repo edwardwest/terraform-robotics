@@ -1,0 +1,197 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(340px, 480px) 1fr;
+  min-height: calc(100dvh - var(--header-h));
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-4) var(--space-5) max(var(--space-4), calc((100vw - var(--content-max)) / 2 + var(--space-4)));
+  min-width: 0;
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.addressRow {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.addressRow .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.sources {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.sources legend {
+  margin-bottom: var(--space-1);
+  padding: 0;
+}
+
+.radioRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 64px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  cursor: pointer;
+  transition: border-color var(--fade);
+}
+
+.radioRow:hover:not(.disabledRow),
+.checked {
+  border-color: var(--border-strong);
+}
+
+.radioRow input {
+  appearance: none;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--stone-400);
+  display: grid;
+  place-items: center;
+  cursor: inherit;
+}
+
+.radioRow input:checked {
+  border-color: var(--white);
+}
+
+.radioRow input:checked::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--white);
+}
+
+.radioText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.disabledRow {
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.disabledRow .radioText > *,
+.disabledRow input {
+  color: var(--fg-faint);
+  border-color: var(--fg-faint);
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-pill);
+  color: var(--fg-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 0 var(--space-1) var(--space-3);
+}
+
+.upload label {
+  cursor: pointer;
+}
+
+.upload :global(.error-text) {
+  flex-basis: 100%;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+}
+
+.stats dd {
+  margin: var(--space-1) 0 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mapPanel {
+  position: sticky;
+  top: var(--header-h);
+  height: calc(100dvh - var(--header-h));
+  padding: var(--space-3) 0 var(--space-3) 0;
+}
+
+.mapPanel > * {
+  border-radius: 24px 0 0 24px;
+  border: 1px solid var(--border-subtle);
+  border-right: 0;
+}
+
+.mapLoading {
+  width: 100%;
+  height: 100%;
+  background: var(--ink-200);
+  border-radius: 24px 0 0 24px;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .left {
+    padding: var(--space-4) 16px;
+  }
+  .mapPanel {
+    position: relative;
+    top: 0;
+    order: -1;
+    height: 56vh;
+    min-height: 360px;
+    padding: 16px 0 0 16px;
+  }
+}
