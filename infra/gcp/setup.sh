@@ -59,24 +59,24 @@ gcloud storage buckets describe "$BUCKET" >/dev/null 2>&1 ||
   gcloud storage buckets create "$BUCKET" --location="$REGION" --uniform-bucket-level-access
 
 say "Service accounts and roles"
-for SA in api terrain-worker web; do
+for SA in tr-api terrain-worker tr-web; do
   gcloud iam service-accounts describe "$SA@$PROJECT.iam.gserviceaccount.com" >/dev/null 2>&1 ||
     gcloud iam service-accounts create "$SA"
 done
 sleep 5   # new service accounts take a moment to become visible to IAM
 bind() { gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$1" --role="$2" --condition=None >/dev/null; }
-for SA in api terrain-worker; do
+for SA in tr-api terrain-worker; do
   M=$SA@$PROJECT.iam.gserviceaccount.com
   bind "$M" roles/cloudsql.client
   gcloud secrets add-iam-policy-binding database-url --member="serviceAccount:$M" --role=roles/secretmanager.secretAccessor >/dev/null
   gcloud storage buckets add-iam-policy-binding "$BUCKET" --member="serviceAccount:$M" --role=roles/storage.objectAdmin >/dev/null
 done
-gcloud secrets add-iam-policy-binding clerk-secret-key --member="serviceAccount:web@$PROJECT.iam.gserviceaccount.com" \
+gcloud secrets add-iam-policy-binding clerk-secret-key --member="serviceAccount:tr-web@$PROJECT.iam.gserviceaccount.com" \
   --role=roles/secretmanager.secretAccessor >/dev/null
 # the API starts worker executions with argument overrides
-bind "api@$PROJECT.iam.gserviceaccount.com" roles/run.developer
+bind "tr-api@$PROJECT.iam.gserviceaccount.com" roles/run.developer
 gcloud iam service-accounts add-iam-policy-binding "terrain-worker@$PROJECT.iam.gserviceaccount.com" \
-  --member="serviceAccount:api@$PROJECT.iam.gserviceaccount.com" --role=roles/iam.serviceAccountUser >/dev/null
+  --member="serviceAccount:tr-api@$PROJECT.iam.gserviceaccount.com" --role=roles/iam.serviceAccountUser >/dev/null
 # Cloud Build: push images, deploy Cloud Run, act as the runtime service accounts, write logs
 for ROLE in roles/run.admin roles/iam.serviceAccountUser roles/artifactregistry.writer roles/logging.logWriter roles/storage.objectViewer; do
   bind "$BUILD_SA" "$ROLE"

@@ -18,7 +18,7 @@ In Cloud Shell, from a clone of this repo:
 infra/gcp/setup.sh PROJECT_ID BILLING_ACCOUNT_ID us-west1
 ```
 
-It links billing, enables APIs, and creates the Artifact Registry repo, Cloud SQL (PostgreSQL 16, `db-f1-micro`), the schema from `backend/sql`, the data bucket, the `database-url` secret (with a generated password nobody sees), and service accounts `api`, `terrain-worker` and `web` with their roles. It is safe to re-run.
+It links billing, enables APIs, and creates the Artifact Registry repo, Cloud SQL (PostgreSQL 16, `db-f1-micro`), the schema from `backend/sql`, the data bucket, the `database-url` secret (with a generated password nobody sees), and service accounts `tr-api`, `terrain-worker` and `tr-web` with their roles. It is safe to re-run.
 
 Then add the Clerk secret key (never commit it):
 
