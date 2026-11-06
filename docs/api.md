@@ -2,6 +2,12 @@
 
 Base URL: `/api` (FastAPI, `backend/src/tr_api`). All geometry is GeoJSON in EPSG:4326. Lengths in metres, areas in square metres, elevations in metres; the web app converts to feet and acres for display.
 
+## Authentication
+
+Every endpoint except `GET /api/health` requires `Authorization: Bearer <Clerk session token>`. The web app's server-side proxy attaches it, so the browser never calls the API directly. Requests without a valid token get `401`. Users see only their own projects; another user's project returns `404`.
+
+`GET /api/me` → `{ "id", "clerk_user_id", "email", "name", "created_at" }` (created on first request; email and name come from custom session-token claims).
+
 ## Projects
 
 `POST /api/projects`

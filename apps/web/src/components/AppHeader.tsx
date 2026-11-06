@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { Show, UserButton } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import styles from "./AppHeader.module.css";
 
@@ -59,6 +60,11 @@ export function AppHeader() {
           </ol>
         </nav>
       )}
+      <div className={styles.account}>
+        <Show when="signed-in">
+          <UserButton />
+        </Show>
+      </div>
     </header>
   );
 }

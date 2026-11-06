@@ -5,6 +5,9 @@ substitutions:
   _REPO: terraform-robotics
   _SQL_INSTANCE: terraform-db
   _BUCKET: ${PROJECT_ID}-terraform-data
+  _CLERK_PUBLISHABLE_KEY: pk_test_YXJyaXZpbmctYmFzaWxpc2stNzE2OC5jbGVyay5hY2NvdW50cy5kZXYk
+  _CLERK_JWKS_URL: https://arriving-basilisk-7168.clerk.accounts.dev/.well-known/jwks.json
+  _WEB_ORIGIN: ""  # the web app's public URL, for CLERK_AUTHORIZED_PARTIES (set after the first deploy)
 images:
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/api:${SHORT_SHA}
   - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/worker:${SHORT_SHA}
@@ -18,7 +21,8 @@ steps:
     args: ["build", "-f", "backend/Dockerfile.worker", "-t", "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/worker:${SHORT_SHA}", "backend"]
   - id: build-web
     name: gcr.io/cloud-builders/docker
-    args: ["build", "-t", "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/web:${SHORT_SHA}", "apps/web"]
+    args: ["build", "-f", "apps/web/Dockerfile", "--build-arg", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${_CLERK_PUBLISHABLE_KEY}",
+           "-t", "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/web:${SHORT_SHA}", "."]
   - id: push
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
@@ -40,10 +44,10 @@ steps:
            "--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/api:${SHORT_SHA}",
            "--service-account=api@${PROJECT_ID}.iam.gserviceaccount.com",
            "--set-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE}",
-           "--set-env-vars=STORAGE_URL=gs://${_BUCKET},JOB_RUNNER=cloudrun,GCP_PROJECT=${PROJECT_ID},GCP_REGION=${_REGION},TERRAIN_JOB_NAME=terrain-worker",
+           "--set-env-vars=STORAGE_URL=gs://${_BUCKET},JOB_RUNNER=cloudrun,GCP_PROJECT=${PROJECT_ID},GCP_REGION=${_REGION},TERRAIN_JOB_NAME=terrain-worker,CLERK_JWKS_URL=${_CLERK_JWKS_URL},CLERK_AUTHORIZED_PARTIES=${_WEB_ORIGIN}",
            "--set-secrets=DATABASE_URL=database-url:latest",
            "--memory=2Gi", "--allow-unauthenticated"]
   - id: deploy-web
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: bash
-    args: ["-c", "gcloud run deploy web --region=${_REGION} --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/web:${SHORT_SHA} --set-env-vars=API_URL=$(gcloud run services describe api --region=${_REGION} --format='value(status.url)') --allow-unauthenticated"]
+    args: ["-c", "gcloud run deploy web --region=${_REGION} --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/web:${SHORT_SHA} --set-env-vars=API_URL=$(gcloud run services describe api --region=${_REGION} --format='value(status.url)') --set-secrets=CLERK_SECRET_KEY=clerk-secret-key:latest --allow-unauthenticated"]

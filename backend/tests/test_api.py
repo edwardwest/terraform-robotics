@@ -13,23 +13,6 @@ DB_URL = os.environ.get("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not DB_URL, reason="TEST_DATABASE_URL not set")
 
 
-@pytest.fixture(scope="module")
-def client(tmp_path_factory):
-    os.environ["DATABASE_URL"] = DB_URL
-    os.environ["STORAGE_URL"] = "file://" + str(tmp_path_factory.mktemp("storage"))
-    os.environ["JOB_RUNNER"] = "inline"
-    from fastapi.testclient import TestClient
-
-    from tr_api.config import get_settings
-    from tr_api.storage import get_storage
-
-    get_settings.cache_clear()
-    get_storage.cache_clear()
-    from tr_api.main import app
-
-    return TestClient(app)
-
-
 def _boundary_lnglat(terrain, inset=15):
     from shapely.geometry import box, mapping
 

@@ -1,6 +1,8 @@
 // Forwards a request to the backend API. API_URL is read at request time, so one built image works in every
 // environment (local Docker, Cloud Run) — unlike next.config rewrites, which are fixed at build time.
-const HOP_BY_HOP = new Set(["host", "connection", "content-length", "transfer-encoding", "keep-alive", "upgrade"]);
+import { auth } from "@clerk/nextjs/server";
+
+const HOP_BY_HOP = new Set(["host", "connection", "content-length", "transfer-encoding", "keep-alive", "upgrade", "cookie"]);
 
 export async function proxy(request: Request, prefix: "/api" | "/files", path: string[]): Promise<Response> {
   const base = (process.env.API_URL || "http://localhost:8000").replace(/\/$/, "");
@@ -11,6 +13,12 @@ export async function proxy(request: Request, prefix: "/api" | "/files", path: s
   request.headers.forEach((value, key) => {
     if (!HOP_BY_HOP.has(key.toLowerCase())) headers.set(key, value);
   });
+
+  // The browser never sees the API: the session token is attached here, server-side.
+  const { getToken } = await auth();
+  const token = await getToken();
+  if (token) headers.set("authorization", `Bearer ${token}`);
+  else headers.delete("authorization");
 
   const hasBody = !["GET", "HEAD"].includes(request.method);
   const upstream = await fetch(target, {

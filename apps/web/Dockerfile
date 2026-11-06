@@ -1,4 +1,8 @@
 FROM node:22-slim AS build
+# Public Clerk key is inlined into the client bundle at build time
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
+    NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 WORKDIR /repo
 COPY packages/design-tokens ./packages/design-tokens
 COPY apps/web/package.json apps/web/package-lock.json ./apps/web/

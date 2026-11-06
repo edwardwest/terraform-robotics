@@ -17,6 +17,7 @@ from tr_geo import project_geometry, read_geotiff
 from tr_geo.terrain import sample_line
 
 from . import schemas
+from .auth import CurrentUser
 from .db import execute, fetch_all, fetch_one
 from .jobs import dispatch_terrain_job
 from .storage import get_storage
@@ -52,8 +53,9 @@ SURVEY_COLUMNS = "id, project_id, kind, filename, status, resolution_m, grade, e
 JOB_COLUMNS = "id, project_id, kind, status, step, step_index, step_count, error, created_at, finished_at"
 
 
-def _project_or_404(project_id: UUID) -> dict:
-    row = fetch_one(PROJECT_SELECT + " WHERE id = :id", id=str(project_id))
+def _project_or_404(project_id: UUID, user: dict) -> dict:
+    """The project if the user owns it. Someone else's project is reported as not found."""
+    row = fetch_one(PROJECT_SELECT + " WHERE id = :id AND owner_id = :uid", id=str(project_id), uid=str(user["id"]))
     if not row:
         raise HTTPException(404, "Project not found")
     return row
@@ -65,15 +67,20 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/me", response_model=schemas.User)
+def me(user: CurrentUser):
+    return user
+
+
 # ---- Projects ---------------------------------------------------------------------------------
 
 
 @app.post("/api/projects", response_model=schemas.Project, status_code=201)
-def create_project(body: schemas.ProjectCreate):
+def create_project(body: schemas.ProjectCreate, user: CurrentUser):
     boundary = json.dumps(body.boundary.model_dump()) if body.boundary else None
     row = fetch_one(
-        """INSERT INTO projects (name, address, boundary, boundary_source)
-           VALUES (:name, :address,
+        """INSERT INTO projects (owner_id, name, address, boundary, boundary_source)
+           VALUES (:uid, :name, :address,
                    CASE WHEN CAST(:boundary AS text) IS NULL THEN NULL
                         ELSE ST_SetSRID(ST_GeomFromGeoJSON(CAST(:boundary AS text)), 4326) END,
                    :source)
@@ -82,23 +89,24 @@ def create_project(body: schemas.ProjectCreate):
         address=body.address,
         boundary=boundary,
         source=body.boundary_source if body.boundary else None,
+        uid=str(user["id"]),
     )
-    return _project_or_404(row["id"])
+    return _project_or_404(row["id"], user)
 
 
 @app.get("/api/projects", response_model=list[schemas.Project])
-def list_projects():
-    return fetch_all(PROJECT_SELECT + " ORDER BY created_at DESC")
+def list_projects(user: CurrentUser):
+    return fetch_all(PROJECT_SELECT + " WHERE owner_id = :uid ORDER BY created_at DESC", uid=str(user["id"]))
 
 
 @app.get("/api/projects/{project_id}", response_model=schemas.Project)
-def get_project(project_id: UUID):
-    return _project_or_404(project_id)
+def get_project(project_id: UUID, user: CurrentUser):
+    return _project_or_404(project_id, user)
 
 
 @app.put("/api/projects/{project_id}/boundary", response_model=schemas.Project)
-def update_boundary(project_id: UUID, body: schemas.BoundaryUpdate):
-    _project_or_404(project_id)
+def update_boundary(project_id: UUID, body: schemas.BoundaryUpdate, user: CurrentUser):
+    _project_or_404(project_id, user)
     execute(
         """UPDATE projects
            SET boundary = ST_SetSRID(ST_GeomFromGeoJSON(:boundary), 4326), boundary_source = :source
@@ -107,23 +115,23 @@ def update_boundary(project_id: UUID, body: schemas.BoundaryUpdate):
         source=body.source,
         id=str(project_id),
     )
-    return _project_or_404(project_id)
+    return _project_or_404(project_id, user)
 
 
 # ---- Surveys ----------------------------------------------------------------------------------
 
 
 @app.get("/api/projects/{project_id}/surveys", response_model=list[schemas.Survey])
-def list_surveys(project_id: UUID):
-    _project_or_404(project_id)
+def list_surveys(project_id: UUID, user: CurrentUser):
+    _project_or_404(project_id, user)
     return fetch_all(
         f"SELECT {SURVEY_COLUMNS} FROM surveys WHERE project_id = :id ORDER BY created_at", id=str(project_id)
     )
 
 
 @app.post("/api/projects/{project_id}/surveys", response_model=schemas.Survey, status_code=201)
-def upload_survey(project_id: UUID, kind: str = Form(...), file: UploadFile = File(...)):
-    _project_or_404(project_id)
+def upload_survey(project_id: UUID, user: CurrentUser, kind: str = Form(...), file: UploadFile = File(...)):
+    _project_or_404(project_id, user)
     if kind not in UPLOAD_EXTENSIONS:
         raise HTTPException(422, f"kind must be one of {sorted(UPLOAD_EXTENSIONS)}")
     filename = PurePosixPath(file.filename or "upload").name
@@ -143,9 +151,9 @@ def upload_survey(project_id: UUID, kind: str = Form(...), file: UploadFile = Fi
 
 
 @app.post("/api/projects/{project_id}/surveys/public-dem", response_model=schemas.Survey, status_code=201)
-def add_public_dem(project_id: UUID):
+def add_public_dem(project_id: UUID, user: CurrentUser):
     """Record that the terrain job should fetch USGS 3DEP elevation for this parcel (fetched at job time)."""
-    _project_or_404(project_id)
+    _project_or_404(project_id, user)
     existing = fetch_one(
         f"SELECT {SURVEY_COLUMNS} FROM surveys WHERE project_id = :id AND kind = 'public_dem'", id=str(project_id)
     )
@@ -162,8 +170,8 @@ def add_public_dem(project_id: UUID):
 
 
 @app.post("/api/projects/{project_id}/terrain-jobs", response_model=schemas.Job, status_code=202)
-def start_terrain_job(project_id: UUID, body: schemas.TerrainJobCreate | None = None):
-    project = _project_or_404(project_id)
+def start_terrain_job(project_id: UUID, user: CurrentUser, body: schemas.TerrainJobCreate | None = None):
+    project = _project_or_404(project_id, user)
     if not project["boundary"]:
         raise HTTPException(409, "Set the parcel boundary before building the terrain model")
     running = fetch_one(
@@ -185,15 +193,22 @@ def start_terrain_job(project_id: UUID, body: schemas.TerrainJobCreate | None = 
 
 
 @app.get("/api/jobs/{job_id}", response_model=schemas.Job)
-def get_job(job_id: UUID):
-    job = fetch_one(f"SELECT {JOB_COLUMNS} FROM jobs WHERE id = :id", id=str(job_id))
+def get_job(job_id: UUID, user: CurrentUser):
+    job = fetch_one(
+        f"""SELECT {', '.join('j.' + c.strip() for c in JOB_COLUMNS.split(','))}
+            FROM jobs j JOIN projects p ON p.id = j.project_id
+            WHERE j.id = :id AND p.owner_id = :uid""",
+        id=str(job_id),
+        uid=str(user["id"]),
+    )
     if not job:
         raise HTTPException(404, "Job not found")
     return job
 
 
 @app.get("/api/projects/{project_id}/terrain", response_model=schemas.TerrainSummary)
-def get_terrain(project_id: UUID):
+def get_terrain(project_id: UUID, user: CurrentUser):
+    _project_or_404(project_id, user)
     row = fetch_one("SELECT summary, dem_path FROM terrain_results WHERE project_id = :id", id=str(project_id))
     if not row:
         raise HTTPException(404, "No terrain model yet")
@@ -208,9 +223,10 @@ def get_terrain(project_id: UUID):
 
 
 @app.get("/api/projects/{project_id}/layers/{layer}")
-def get_layer(project_id: UUID, layer: str):
+def get_layer(project_id: UUID, layer: str, user: CurrentUser):
     if layer not in LAYERS:
         raise HTTPException(404, f"Unknown layer; choose one of {LAYERS}")
+    _project_or_404(project_id, user)
     row = fetch_one(
         """SELECT json_build_object(
                'type', 'FeatureCollection',
@@ -226,7 +242,8 @@ def get_layer(project_id: UUID, layer: str):
 
 
 @app.patch("/api/projects/{project_id}/keypoints/{kp_id}")
-def update_keypoint(project_id: UUID, kp_id: str, body: schemas.KeypointUpdate):
+def update_keypoint(project_id: UUID, kp_id: str, body: schemas.KeypointUpdate, user: CurrentUser):
+    _project_or_404(project_id, user)
     row = fetch_one(
         """UPDATE terrain_features
            SET properties = jsonb_set(properties, '{confirmed}', to_jsonb(CAST(:confirmed AS boolean)))
@@ -248,7 +265,8 @@ def _load_dem(path: str):
 
 
 @app.get("/api/projects/{project_id}/profile", response_model=schemas.Profile)
-def get_profile(project_id: UUID, coords: str = Query(..., description="lng,lat;lng,lat"), samples: int = Query(200, ge=2, le=2000)):
+def get_profile(project_id: UUID, user: CurrentUser, coords: str = Query(..., description="lng,lat;lng,lat"), samples: int = Query(200, ge=2, le=2000)):
+    _project_or_404(project_id, user)
     row = fetch_one("SELECT dem_path FROM terrain_results WHERE project_id = :id", id=str(project_id))
     if not row:
         raise HTTPException(404, "No terrain model yet")
@@ -264,16 +282,23 @@ def get_profile(project_id: UUID, coords: str = Query(..., description="lng,lat;
 
 
 @app.get("/files/{key:path}")
-def get_file(key: str):
+def get_file(key: str, user: CurrentUser):
     storage = get_storage()
-    if not key.startswith("projects/") or not storage.exists(key):
+    parts = key.split("/")
+    if len(parts) < 3 or parts[0] != "projects" or ".." in parts:
+        raise HTTPException(404, "File not found")
+    try:
+        _project_or_404(UUID(parts[1]), user)
+    except ValueError:
+        raise HTTPException(404, "File not found")
+    if not storage.exists(key):
         raise HTTPException(404, "File not found")
     return FileResponse(storage.local_path(key))
 
 
 @app.get("/api/projects/{project_id}/geojson")
-def project_geojson(project_id: UUID):
+def project_geojson(project_id: UUID, user: CurrentUser):
     """The boundary as a Feature, for quick inspection in GIS tools."""
-    p = _project_or_404(project_id)
+    p = _project_or_404(project_id, user)
     return {"type": "Feature", "geometry": p["boundary"], "properties": {"name": p["name"]}}
 

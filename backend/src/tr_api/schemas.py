@@ -30,6 +30,14 @@ class Polygon(BaseModel):
         return v
 
 
+class User(BaseModel):
+    id: UUID
+    clerk_user_id: str
+    email: str | None
+    name: str | None
+    created_at: datetime
+
+
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     address: str | None = Field(default=None, max_length=500)

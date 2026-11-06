@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "@/styles/globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
 import { AppHeader } from "@/components/AppHeader";
+import { clerkAppearance } from "@/lib/clerkAppearance";
 
 export const metadata: Metadata = {
   title: "Terraform Robotics",
@@ -17,11 +19,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        <AppHeader />
-        <main id="main">{children}</main>
-      </body>
-    </html>
+    <ClerkProvider appearance={clerkAppearance} afterSignOutUrl="/sign-in">
+      <html lang="en">
+        <body>
+          <AppHeader />
+          <main id="main">{children}</main>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

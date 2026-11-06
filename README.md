@@ -50,11 +50,15 @@ pip install -e ".[dev]"
 export DATABASE_URL=postgresql+psycopg://localhost/terraform
 uvicorn tr_api.main:app --reload
 
-# web (separate shell)
-cd apps/web && npm install && npm run dev
+# web (separate shell): add CLERK_SECRET_KEY from the Clerk dashboard to apps/web/.env.local first
+cd apps/web && cp .env.example .env.local && npm install && npm run dev
 ```
 
-Run tests with `cd backend && pytest`.
+Run tests with `cd backend && pytest` (set `TEST_DATABASE_URL` to include the database tests).
+
+## Sign-in
+
+Users sign in with [Clerk](https://clerk.com) (email or Google), in the **Terraform Robotics** app of the Clerk account. The web app protects every page and forwards the session token to the API, which verifies it against Clerk's public keys (`CLERK_JWKS_URL`) and scopes all data to the signed-in user. For backend-only work without Clerk, set `AUTH_DISABLED=true` on the API.
 
 ## How terrain jobs run
 

@@ -14,6 +14,7 @@
     "test": "node --test src/lib/units.test.ts"
   },
   "dependencies": {
+    "@clerk/nextjs": "7.9.19",
     "@turf/area": "7.4.0",
     "@turf/length": "7.4.0",
     "maplibre-gl": "6.15.0",

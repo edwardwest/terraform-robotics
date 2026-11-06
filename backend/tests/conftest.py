@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pytest
 from affine import Affine
@@ -35,3 +36,54 @@ def boundary(terrain):
     rows, cols = terrain.shape
     inset = 15 * terrain.res
     return box(ORIGIN_X + inset, ORIGIN_Y - rows * terrain.res + inset, ORIGIN_X + cols * terrain.res - inset, ORIGIN_Y - inset)
+
+
+@pytest.fixture(scope="session")
+def signing_key():
+    """An RSA key standing in for Clerk's: `token(sub, ...)` mints session tokens the API will accept."""
+    import time
+
+    import jwt
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_pem = private.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode()
+
+    def token(sub, email=None, name=None, azp="http://localhost:3000", expires_in=300, key=private):
+        now = int(time.time())
+        claims = {"sub": sub, "iat": now, "nbf": now, "exp": now + expires_in, "azp": azp,
+                  "iss": "https://example.clerk.accounts.dev"}
+        if email:
+            claims["email"] = email
+        if name:
+            claims["name"] = name
+        return jwt.encode(claims, key, algorithm="RS256")
+
+    return {"public_pem": public_pem, "token": token}
+
+
+@pytest.fixture(scope="session")
+def client(tmp_path_factory, signing_key):
+    DB_URL = os.environ["TEST_DATABASE_URL"]
+    os.environ["DATABASE_URL"] = DB_URL
+    os.environ["STORAGE_URL"] = "file://" + str(tmp_path_factory.mktemp("storage"))
+    os.environ["JOB_RUNNER"] = "inline"
+    os.environ["CLERK_JWT_KEY"] = signing_key["public_pem"]
+    os.environ["CLERK_AUTHORIZED_PARTIES"] = "http://localhost:3000"
+    from fastapi.testclient import TestClient
+
+    from tr_api.config import get_settings
+    from tr_api.storage import get_storage
+
+    get_settings.cache_clear()
+    get_storage.cache_clear()
+    from tr_api.main import app
+
+    c = TestClient(app)
+    c.headers["Authorization"] = f"Bearer {signing_key['token']('user_alice', email='alice@example.com', name='Alice')}"
+    return c
+
+

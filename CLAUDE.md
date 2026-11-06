@@ -16,3 +16,8 @@ Terraform Robotics: site survey → terrain model → regenerative design. See R
 - API dev server: `cd backend && uvicorn tr_api.main:app --reload`
 - Web dev: `cd apps/web && npm run dev`
 - Regenerate tokens CSS: `cd apps/web && npm run tokens`
+
+## Auth
+- Clerk (app "Terraform Robotics" in edward@appliedalchemy.co's Clerk account). Every API route except `/api/health` takes `user: CurrentUser` and must scope queries to `owner_id`; use `_project_or_404(project_id, user)`.
+- The browser never calls the API directly: `apps/web/src/lib/server/proxy.ts` attaches the Clerk session token.
+- Never commit `CLERK_SECRET_KEY`; publishable key and JWKS URL are public.
