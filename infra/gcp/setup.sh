@@ -46,7 +46,7 @@ if [ -z "$PROXY" ]; then
   curl -sSLo "$PROXY" https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.1/cloud-sql-proxy.linux.amd64
   chmod +x "$PROXY"
 fi
-"$PROXY" --port 6543 "$PROJECT:$REGION:$SQL_INSTANCE" >/tmp/cloud-sql-proxy.log 2>&1 &
+"$PROXY" --token "$(gcloud auth print-access-token)" --enable-builtin-metrics=false --port 6543 "$PROJECT:$REGION:$SQL_INSTANCE" >/tmp/cloud-sql-proxy.log 2>&1 &
 PROXY_PID=$!; trap 'kill $PROXY_PID 2>/dev/null || true' EXIT
 for _ in $(seq 30); do pg_isready -h 127.0.0.1 -p 6543 >/dev/null 2>&1 && break; sleep 1; done
 for f in backend/sql/*.sql; do
