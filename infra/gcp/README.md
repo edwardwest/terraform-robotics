@@ -12,51 +12,24 @@ Data: Cloud SQL for PostgreSQL 16 with PostGIS; uploads and DEMs in a Cloud Stor
 
 ## One-time setup
 
+In Cloud Shell, from a clone of this repo:
+
 ```bash
-PROJECT=your-project; REGION=us-west1
-gcloud config set project $PROJECT
-gcloud services enable run.googleapis.com sqladmin.googleapis.com artifactregistry.googleapis.com \
-  cloudbuild.googleapis.com secretmanager.googleapis.com storage.googleapis.com
+infra/gcp/setup.sh PROJECT_ID BILLING_ACCOUNT_ID us-west1
+```
 
-# Images
-gcloud artifacts repositories create terraform-robotics --repository-format=docker --location=$REGION
+It links billing, enables APIs, and creates the Artifact Registry repo, Cloud SQL (PostgreSQL 16, `db-f1-micro`), the schema from `backend/sql`, the data bucket, the `database-url` secret (with a generated password nobody sees), and service accounts `api`, `terrain-worker` and `web` with their roles. It is safe to re-run.
 
-# Database
-gcloud sql instances create terraform-db --database-version=POSTGRES_16 --region=$REGION --tier=db-custom-1-3840
-gcloud sql databases create terraform --instance=terraform-db
-gcloud sql users create terraform --instance=terraform-db --password=CHANGE_ME
-# then connect (Cloud SQL Studio or the proxy) and run backend/sql/001_init.sql — it enables PostGIS
+Then add the Clerk secret key (never commit it):
 
-# Storage
-gcloud storage buckets create gs://$PROJECT-terraform-data --location=$REGION --uniform-bucket-level-access
-
-# Connection string as a secret (Cloud SQL unix socket)
-printf 'postgresql+psycopg://terraform:CHANGE_ME@/terraform?host=/cloudsql/%s:%s:terraform-db' $PROJECT $REGION \
-  | gcloud secrets create database-url --data-file=-
-
-# Clerk secret key for the web app (paste it from the Clerk dashboard when prompted; never commit it)
-gcloud secrets create clerk-secret-key --data-file=-
-
-# Service accounts
-gcloud iam service-accounts create api
-gcloud iam service-accounts create terrain-worker
-for SA in api terrain-worker; do
-  for ROLE in roles/cloudsql.client roles/secretmanager.secretAccessor; do  # web also reads clerk-secret-key
-    gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$SA@$PROJECT.iam.gserviceaccount.com --role=$ROLE
-  done
-  gcloud storage buckets add-iam-policy-binding gs://$PROJECT-terraform-data \
-    --member=serviceAccount:$SA@$PROJECT.iam.gserviceaccount.com --role=roles/storage.objectAdmin
-done
-# the API starts worker executions with argument overrides
-gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:api@$PROJECT.iam.gserviceaccount.com --role=roles/run.developer
-gcloud iam service-accounts add-iam-policy-binding terrain-worker@$PROJECT.iam.gserviceaccount.com \
-  --member=serviceAccount:api@$PROJECT.iam.gserviceaccount.com --role=roles/iam.serviceAccountUser
+```bash
+gcloud secrets versions add clerk-secret-key --data-file=-   # paste the key, then Ctrl-D
 ```
 
 ## Deploy
 
 ```bash
-gcloud builds submit --config infra/gcp/cloudbuild.yaml --substitutions=_REGION=$REGION,SHORT_SHA=$(git rev-parse --short HEAD)
+gcloud builds submit --config infra/gcp/cloudbuild.yaml --substitutions=_REGION=us-west1,SHORT_SHA=$(git rev-parse --short HEAD)
 ```
 
 ## Before real users
