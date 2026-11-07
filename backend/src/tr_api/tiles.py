@@ -41,7 +41,10 @@ def _fill_nodata(z: np.ndarray, valid: np.ndarray) -> np.ndarray:
     from scipy import ndimage
 
     idx = ndimage.distance_transform_edt(~valid, return_distances=False, return_indices=True)
-    return z[tuple(idx)]
+    filled = z[tuple(idx)]
+    # nearest fill alone smears edge values into streaks in the hillshade; blur only the filled part
+    soft = ndimage.gaussian_filter(filled, sigma=24, mode="nearest")
+    return np.where(valid, z, soft)
 
 
 _SLOPE_LOCK = threading.Lock()
