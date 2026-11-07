@@ -164,6 +164,31 @@ export interface Estimate {
   note: string;
 }
 
+export interface ChatMessage { role: "user" | "assistant"; content: string }
+
+export interface Proposal {
+  id: string;
+  kind: "keyline" | "swale";
+  params: Record<string, unknown>;
+  preview: DesignCollection;
+  summary: Record<string, unknown> & { notes?: string[] };
+  status: "draft" | "accepted" | "discarded";
+  created_at: string;
+}
+
+export interface AssistantReply {
+  reply: string;
+  model: string;
+  tool_log: { tool: string; input: Record<string, unknown>; error?: string | null }[];
+  proposals: Proposal[];
+  citations: { title: string; url: string | null; code: string | null }[];
+}
+
+export interface KnowledgeHit {
+  chunk_id: string; title: string; code: string | null; url: string | null; source: string; license: string;
+  heading: string | null; body: string; score: number;
+}
+
 export interface GeocodeResult { label: string; lng: number; lat: number; source: string }
 export interface Parcel { apn: string | null; address: string | null; acres: number | null; boundary: Polygon; source: string }
 
@@ -274,6 +299,15 @@ export const api = {
   updateCostItem: (item: string, rate_low: number, rate_high: number) =>
     request<CostItem>(`/cost-items/${encodeURIComponent(item)}`, { method: "PUT", body: json({ rate_low, rate_high }) }),
   resetCostItem: (item: string) => request<void>(`/cost-items/${encodeURIComponent(item)}`, { method: "DELETE" }),
+
+  askAssistant: (id: string, messages: ChatMessage[], allowPlanning: boolean) =>
+    request<AssistantReply>(`/projects/${id}/assistant`, { method: "POST", body: json({ messages, allow_planning: allowPlanning }) }),
+  listProposals: (id: string) => request<Proposal[]>(`/projects/${id}/assistant/proposals`),
+  acceptProposal: (id: string, pid: string) =>
+    request<Proposal>(`/projects/${id}/assistant/proposals/${pid}/accept`, { method: "POST" }),
+  discardProposal: (id: string, pid: string) =>
+    request<void>(`/projects/${id}/assistant/proposals/${pid}/discard`, { method: "POST" }),
+  searchKnowledge: (q: string) => request<KnowledgeHit[]>(`/knowledge/search?q=${encodeURIComponent(q)}`),
 
   geocode: (q: string) => request<GeocodeResult[]>(`/geocode?q=${encodeURIComponent(q)}`),
   parcelAt: (lng: number, lat: number) => request<Parcel>(`/parcels/at?lng=${lng}&lat=${lat}`),

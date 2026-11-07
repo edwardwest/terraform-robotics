@@ -134,3 +134,23 @@ All return a file download: `GET /api/projects/{id}/export/geojson`, `/export/sh
 `GET /api/geocode?q=...` → `[{label, lng, lat, source}]` (US Census geocoder, county address records, then OpenStreetMap Nominatim).
 
 `GET /api/parcels/at?lng=&lat=` → `{ apn, address, acres, boundary: Polygon, source }` from a county parcel service (`404` where none covers the point). `GET /api/parcels/coverage` lists the counties.
+
+## Knowledge base
+
+`GET /api/knowledge/search?q=&source=nrcs_cps|rules&limit=6` → passages `[{chunk_id, title, code, url, source, license, heading, body, score}]`. Hybrid ranking: full-text (any word) plus pgvector similarity (Vertex `text-embedding-005`), fused by reciprocal rank. Only commercially usable sources are stored (NRCS standards and USDA PLANTS are US government works; design rules are in-house).
+
+`GET /api/knowledge/rules` → the design rules library (id, title, status, applies_to, parameters, sources, body).
+
+`GET /api/knowledge/stats` → document, chunk and species counts.
+
+`GET /api/species?q=&growth_habit=&nitrogen_fixing=&drought_tolerance=&shade_tolerance=&min_temp_f_at_most=&limit=` → USDA PLANTS species with traits.
+
+Ingestion runs in the cloud: `tr-worker kb rules|nrcs|plants|all` (see `infra/gcp/kb.sh`).
+
+## Design assistant (W9)
+
+`POST /api/projects/{id}/assistant` with `{ "messages": [{ "role": "user"|"assistant", "content": "..." }], "allow_planning": false }` → `{ reply, model, tool_log[], proposals[], citations[] }`. Claude (Vertex AI) calls tools: `get_site_summary`, `propose_keyline_pattern`, `propose_swale` (placed relative to a keypoint, never by coordinates), `get_estimate`, `search_knowledge`, `find_species`. Design requests route to `ASSISTANT_DESIGN_MODEL` (default `claude-opus-5-5`), others to `ASSISTANT_MODEL` (default `claude-sonnet-5-5`).
+
+`GET /api/projects/{id}/assistant/proposals?status=draft` → `Proposal[]` (`{id, kind, params, preview: FeatureCollection, summary, status, created_at}`).
+
+`POST /api/projects/{id}/assistant/proposals/{pid}/accept` recomputes the proposal from its parameters and saves it to the design; `/discard` marks it discarded. Nothing the assistant proposes enters the design until accepted.

@@ -158,4 +158,23 @@ export const designLayers: LayerSpecification[] = [
   },
 ];
 
+/** Assistant proposals being previewed: dashed, so they read as drafts. */
+export const previewLayers: LayerSpecification[] = [
+  {
+    id: "preview-rip",
+    type: "line",
+    source: "preview",
+    filter: ["==", ["get", "kind"], "rip"],
+    paint: { "line-color": "rgba(255,255,255,0.7)", "line-width": 1, "line-dasharray": [2, 2] },
+  },
+  {
+    id: "preview-main",
+    type: "line",
+    source: "preview",
+    filter: ["!=", ["get", "kind"], "rip"],
+    layout: { "line-cap": "round" },
+    paint: { "line-color": "#ffffff", "line-width": 4, "line-dasharray": [1.5, 1.2] },
+  },
+];
+
 export const DESIGN_CLICK_LAYERS = ["design-keyline", "design-rip", "design-swale"];

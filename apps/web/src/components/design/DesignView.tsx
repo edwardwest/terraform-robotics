@@ -12,12 +12,14 @@ import {
   type LayerName,
   type Profile,
   type Project,
+  type Proposal,
   type TerrainSummary,
 } from "@/lib/api";
 import { formatFeet, ftToM, m2ToAcres, mToFt } from "@/lib/units";
 import { IconAlert, IconArrowRight, IconX } from "../Icons";
 import type { LayerData } from "../terrain/TerrainMap";
 import { SectionProfile } from "../terrain/SectionProfile";
+import { AssistantPanel } from "./AssistantPanel";
 import tv from "../terrain/TerrainView.module.css";
 import styles from "./DesignView.module.css";
 
@@ -58,6 +60,7 @@ export function DesignView({ projectId }: { projectId: string }) {
   const [pending, setPending] = useState<[number, number][]>([]);
 
   const [selected, setSelected] = useState<string | null>(null);
+  const [previewProposal, setPreviewProposal] = useState<Proposal | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -367,6 +370,7 @@ export function DesignView({ projectId }: { projectId: string }) {
             mapClickActive={placing}
             onMapClick={onMapClick}
             pending={pending}
+            preview={previewProposal?.preview ?? null}
             showSectionTool={false}
           />
         </div>
@@ -392,6 +396,14 @@ export function DesignView({ projectId }: { projectId: string }) {
             <h2 className="app-h2">Build the terrain first.</h2>
             <Link href={`/projects/${projectId}/survey`} className="btn btn-sm">Go to survey</Link>
           </section>
+        )}
+        {summary && !tooCoarse && (
+          <AssistantPanel
+            projectId={projectId}
+            allowPlanning={needsDraft}
+            onPreview={setPreviewProposal}
+            onDesignChanged={refreshDesign}
+          />
         )}
         {summary && !designGrade && (
           <section className={`card ${tv.panel} ${styles.gradeCard}`}>

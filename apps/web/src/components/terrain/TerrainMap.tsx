@@ -7,7 +7,7 @@ import { ensureMaplibre, SATELLITE_TILES, setSatelliteVisible } from "@/lib/mapl
 import { useMap } from "@/lib/useMap";
 import { emptyFC, polygonFeature } from "@/lib/geo";
 import { IconMap, IconMinus, IconPlus, IconRotate3d, IconRuler } from "../Icons";
-import { analysisLayers, boundaryLayers, DESIGN_CLICK_LAYERS, designLayers, LAYER_IDS, sectionLayers, type ToggleKey } from "./layers";
+import { analysisLayers, boundaryLayers, DESIGN_CLICK_LAYERS, designLayers, LAYER_IDS, previewLayers, sectionLayers, type ToggleKey } from "./layers";
 import styles from "./TerrainMap.module.css";
 
 export type LayerData = Partial<Record<LayerName, FeatureCollection>>;
@@ -31,6 +31,8 @@ interface Props {
   mapClickActive?: boolean;
   onMapClick?: (lngLat: [number, number]) => void;
   pending?: [number, number][];
+  /** Draft geometry to preview (assistant proposals). */
+  preview?: FeatureCollection | null;
   /** Label for the map's own section-drawing chip; hidden when false. */
   showSectionTool?: boolean;
 }
@@ -66,6 +68,7 @@ export function TerrainMap({
   mapClickActive = false,
   onMapClick,
   pending = [],
+  preview = null,
   showSectionTool = true,
 }: Props) {
   const { containerRef, map, error } = useMap();
@@ -84,10 +87,10 @@ export function TerrainMap({
   // Sources and layers, added once.
   useEffect(() => {
     if (!map) return;
-    for (const id of ["boundary", "contours", "flow", "valleys", "ridges", "section", "design", "pending"]) {
+    for (const id of ["boundary", "contours", "flow", "valleys", "ridges", "section", "design", "pending", "preview"]) {
       if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: emptyFC() });
     }
-    for (const l of [...analysisLayers, ...boundaryLayers, ...designLayers, ...sectionLayers]) if (!map.getLayer(l.id)) map.addLayer(l);
+    for (const l of [...analysisLayers, ...boundaryLayers, ...designLayers, ...previewLayers, ...sectionLayers]) if (!map.getLayer(l.id)) map.addLayer(l);
     const click = (e: { lngLat: { lng: number; lat: number }; point: { x: number; y: number } }) => {
       const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
       if (sectionModeRef.current) return onSectionClickRef.current(lngLat);
@@ -134,6 +137,10 @@ export function TerrainMap({
   useEffect(() => {
     if (map?.getLayer("design-selected")) map.setFilter("design-selected", ["==", ["get", "id"], selectedElement ?? "__none__"]);
   }, [map, selectedElement]);
+
+  useEffect(() => {
+    (map?.getSource("preview") as GeoJSONSource | undefined)?.setData(preview ?? emptyFC());
+  }, [map, preview]);
 
   useEffect(() => {
     if (!map) return;

@@ -1,0 +1,144 @@
+.panel {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.starters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.starter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.starter:hover {
+  border-color: var(--border-strong);
+  color: var(--fg-1);
+}
+
+.user,
+.bot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.user {
+  align-self: flex-end;
+  max-width: 88%;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-card);
+  background: var(--surface-pill);
+  color: var(--fg-1);
+}
+
+.bot {
+  color: var(--fg-2);
+}
+
+.para {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.proposal {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.previewing {
+  border-color: var(--border-strong);
+  background: var(--surface-card);
+}
+
+.propHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.propTitle {
+  font-weight: 700;
+  color: var(--fg-1);
+}
+
+.facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px var(--space-2);
+}
+
+.facts dd {
+  margin: 0;
+  color: var(--fg-1);
+}
+
+.note {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+}
+
+.propActions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.cites {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.cites a {
+  color: var(--fg-2);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.input {
+  resize: vertical;
+  min-height: 56px;
+  font: inherit;
+}
+
+.form :global(.btn) {
+  align-self: flex-end;
+}

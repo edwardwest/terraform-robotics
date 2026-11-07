@@ -12,7 +12,7 @@ say "Billing and APIs"
 gcloud billing projects link "$PROJECT" --billing-account="$BILLING" >/dev/null
 gcloud config set project "$PROJECT" >/dev/null
 gcloud services enable run.googleapis.com sqladmin.googleapis.com artifactregistry.googleapis.com \
-  cloudbuild.googleapis.com secretmanager.googleapis.com storage.googleapis.com iam.googleapis.com
+  cloudbuild.googleapis.com secretmanager.googleapis.com storage.googleapis.com iam.googleapis.com aiplatform.googleapis.com
 NUM=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
 BUILD_SA=$NUM-compute@developer.gserviceaccount.com   # Cloud Build's default service account in new projects
 
@@ -73,6 +73,8 @@ for SA in tr-api terrain-worker; do
 done
 gcloud secrets add-iam-policy-binding clerk-secret-key --member="serviceAccount:tr-web@$PROJECT.iam.gserviceaccount.com" \
   --role=roles/secretmanager.secretAccessor >/dev/null
+# Claude (assistant) and text embeddings (knowledge search) on Vertex AI
+for SA in tr-api terrain-worker; do bind "$SA@$PROJECT.iam.gserviceaccount.com" roles/aiplatform.user; done
 # the API starts worker executions with argument overrides
 bind "tr-api@$PROJECT.iam.gserviceaccount.com" roles/run.developer
 gcloud iam service-accounts add-iam-policy-binding "terrain-worker@$PROJECT.iam.gserviceaccount.com" \

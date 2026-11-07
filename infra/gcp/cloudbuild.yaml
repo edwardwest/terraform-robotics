@@ -46,7 +46,7 @@ steps:
            "--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/api:${SHORT_SHA}",
            "--service-account=tr-api@${PROJECT_ID}.iam.gserviceaccount.com",
            "--set-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE}",
-           "--set-env-vars=STORAGE_URL=gs://${_BUCKET},JOB_RUNNER=cloudrun,GCP_PROJECT=${PROJECT_ID},GCP_REGION=${_REGION},TERRAIN_JOB_NAME=terrain-worker,CLERK_JWKS_URL=${_CLERK_JWKS_URL},CLERK_AUTHORIZED_PARTIES=${_WEB_ORIGIN}",
+           "--set-env-vars=STORAGE_URL=gs://${_BUCKET},JOB_RUNNER=cloudrun,GCP_PROJECT=${PROJECT_ID},GCP_REGION=${_REGION},TERRAIN_JOB_NAME=terrain-worker,VERTEX_REGION=global,EMBEDDINGS=vertex,VERTEX_EMBED_REGION=us-central1,CLERK_JWKS_URL=${_CLERK_JWKS_URL},CLERK_AUTHORIZED_PARTIES=${_WEB_ORIGIN}",
            "--set-secrets=DATABASE_URL=database-url:latest",
            "--memory=2Gi", "--allow-unauthenticated"]
   - id: deploy-web
