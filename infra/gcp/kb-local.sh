@@ -15,7 +15,7 @@ for _ in $(seq 30); do pg_isready -h 127.0.0.1 -p 6543 >/dev/null 2>&1 && break;
 
 VENV=$HOME/.venvs/tr-kb
 [ -x "$VENV/bin/python" ] || python3 -m venv "$VENV"
-"$VENV/bin/pip" install -q httpx sqlalchemy "psycopg[binary]" pypdf pyyaml pydantic-settings google-auth requests
+"$VENV/bin/pip" install -q httpx sqlalchemy "psycopg[binary]" pypdf pyyaml pydantic-settings google-auth requests fonttools
 
 DB_ENC=$("$VENV/bin/python" -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=""))' "$DB_PASS")
 export DATABASE_URL="postgresql+psycopg://terraform:${DB_ENC}@127.0.0.1:6543/terraform"
