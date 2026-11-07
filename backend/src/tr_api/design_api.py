@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException
@@ -78,9 +79,17 @@ def get_design(project_id: UUID, user: CurrentUser):
     return {"type": "FeatureCollection", "features": [_feature(r) for r in rows]}
 
 
-@router.post("/api/projects/{project_id}/design/keylines", response_model=schemas.KeylineResult)
-def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentUser):
-    _project_or_404(project_id, user)
+@dataclass
+class KeylinePlan:
+    """A computed keyline pattern, not yet saved: rows for the database and a lon/lat preview."""
+
+    group_id: str
+    rows: list[dict]
+    preview: dict
+    summary: dict
+
+
+def plan_keyline(project_id: UUID, body: schemas.KeylineCreate) -> KeylinePlan:
     t, surface, srid, boundary, ridges, valley_rows = _site_context(project_id)
     valleys = [g for g, _ in valley_rows]
     grade_label = _grade_gate(t["summary"], body.allow_planning)
@@ -96,12 +105,10 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
         raise HTTPException(422, str(e))
     # the keypoint's main valley stem: seeds graded lines and decides which pattern lines belong to it
     valley = geo.valley_trunk(valley_rows, kp) or geo.valley_near(valleys, kp)
-    system = valley
     truncated = False
-
     if body.pattern == "parallel":
         lines = geo.parallel_pattern(surface, keyline, body.spacing_m, boundary, max_lines=body.max_lines,
-                                     valley=system if body.extent == "valley" else None,
+                                     valley=valley if body.extent == "valley" else None,
                                      ridges=ridges if body.extent == "valley" else None)
     elif body.pattern == "graded":
         if valley is None:
@@ -118,34 +125,29 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
     group_id = str(uuid4())
     params = {**body.model_dump(), "terrain_grade": grade_label}
     draft = grade_label != "design"
-    km = geo.line_metrics(surface, keyline, system or valley)
-    rows = [_row(project_id, "keyline", f"Keyline {body.keypoint_id}", _to_lnglat(keyline, t["dem_crs"]), params,
-                 {**km, "keypoint_id": body.keypoint_id, "draft": draft, "stops": [a.stop for a in arms]}, group_id)]
-
+    elements = []  # (kind, label, geom in lon/lat, props)
+    km = geo.line_metrics(surface, keyline, valley)
+    elements.append(("keyline", f"Keyline {body.keypoint_id}", _to_lnglat(keyline, t["dem_crs"]),
+                     {**km, "keypoint_id": body.keypoint_id, "draft": draft, "stops": [a.stop for a in arms]}))
     # Rip lines are labelled top to bottom, which is also the default pass order.
-    measured = []
-    for pl in lines:
-        m = geo.line_metrics(surface, pl.geom, system or valley)
-        measured.append((pl, m))
+    measured = [(pl, geo.line_metrics(surface, pl.geom, valley)) for pl in lines]
     measured.sort(key=lambda pm: -max(pm[1].get("z_start_m", 0), pm[1].get("z_end_m", 0)))
-    notes_all: list[str] = []
     toward = steep = 0
     for i, (pl, m) in enumerate(measured, start=1):
         notes = geo.check_rip(m)
         toward += geo.TOWARD_VALLEY in notes
         steep += any("scour" in n for n in notes)
-        rows.append(_row(project_id, "rip", f"R{i}", _to_lnglat(pl.geom, t["dem_crs"]), params,
-                         {**pl.props, **m, "pass": i, "notes": notes, "draft": draft}, group_id))
-    # Replace this keypoint's previous pattern in one transaction, so a failure leaves the old one intact.
-    with transaction() as tx:
-        tx.execute("SELECT pg_advisory_xact_lock(hashtext(:k))", k=f"{project_id}:{body.keypoint_id}")
-        tx.execute("DELETE FROM design_elements WHERE project_id = :pid AND params->>'keypoint_id' = :kp",
-                   pid=str(project_id), kp=body.keypoint_id)
-        tx.execute_many(INSERT_SQL, rows)
+        elements.append(("rip", f"R{i}", _to_lnglat(pl.geom, t["dem_crs"]), {**pl.props, **m, "pass": i, "notes": notes, "draft": draft}))
+    rows = [_row(project_id, k, label, g, params, props, group_id) for k, label, g, props in elements]
+    preview = {"type": "FeatureCollection", "features": [
+        {"type": "Feature", "geometry": mapping(g), "properties": {**props, "kind": k, "label": label, "length_m": None}}
+        for k, label, g, props in elements]}
+
     total = sum(pl.geom.length for pl, _ in measured)
     treated = 0.0
     if measured:
         treated = unary_union([pl.geom.buffer(body.spacing_m / 2, cap_style="flat") for pl, _ in measured]).intersection(boundary).area
+    notes_all: list[str] = []
     if toward:
         notes_all.append(f"{toward} of {len(measured)} rip lines carry some water back toward the valley.")
     if steep:
@@ -157,23 +159,44 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
         notes_all.append("Stopped early to keep the request quick; widen the spacing to cover the whole valley.")
     if any(a.stop == "terrain" for a in arms):
         notes_all.append("One arm of the keyline ended where the ground went flat or broke away, before a ridge.")
-
-    row = fetch_one(ELEMENT_SELECT + " WHERE project_id = :pid AND group_id = :gid AND kind = 'keyline'",
-                    pid=str(project_id), gid=group_id)
-    return {
-        "group_id": group_id,
-        "keyline": _feature(row),
-        "rip_count": len(measured),
-        "rip_length_m": round(total, 1),
-        "area_treated_m2": round(treated, 1),
-        "terrain_grade": grade_label,
-        "notes": notes_all,
+    summary = {
+        "keypoint_id": body.keypoint_id, "keyline_length_m": round(keyline.length, 1), "rip_count": len(measured),
+        "rip_length_m": round(total, 1), "area_treated_m2": round(treated, 1), "terrain_grade": grade_label,
+        "keyline_fall_to_ridges": km.get("fall_to_ridges_min"), "notes": notes_all,
     }
+    return KeylinePlan(group_id, rows, preview, summary)
 
 
-@router.post("/api/projects/{project_id}/design/swales", response_model=schemas.DesignFeature)
-def create_swale(project_id: UUID, body: schemas.SwaleCreate, user: CurrentUser):
+def save_keyline(project_id: UUID, keypoint_id: str, plan: KeylinePlan) -> None:
+    """Replace this keypoint's previous pattern in one transaction, so a failure leaves the old one intact."""
+    with transaction() as tx:
+        tx.execute("SELECT pg_advisory_xact_lock(hashtext(:k))", k=f"{project_id}:{keypoint_id}")
+        tx.execute("DELETE FROM design_elements WHERE project_id = :pid AND params->>'keypoint_id' = :kp",
+                   pid=str(project_id), kp=keypoint_id)
+        tx.execute_many(INSERT_SQL, plan.rows)
+
+
+@router.post("/api/projects/{project_id}/design/keylines", response_model=schemas.KeylineResult)
+def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentUser):
     _project_or_404(project_id, user)
+    plan = plan_keyline(project_id, body)
+    save_keyline(project_id, body.keypoint_id, plan)
+    row = fetch_one(ELEMENT_SELECT + " WHERE project_id = :pid AND group_id = :gid AND kind = 'keyline'",
+                    pid=str(project_id), gid=plan.group_id)
+    s = plan.summary
+    return {"group_id": plan.group_id, "keyline": _feature(row), "rip_count": s["rip_count"],
+            "rip_length_m": s["rip_length_m"], "area_treated_m2": s["area_treated_m2"],
+            "terrain_grade": s["terrain_grade"], "notes": s["notes"]}
+
+
+@dataclass
+class SwalePlan:
+    geom_ll: object
+    params: dict
+    props: dict
+
+
+def plan_swale(project_id: UUID, body: schemas.SwaleCreate) -> SwalePlan:
     t, surface, srid, boundary, _, _ = _site_context(project_id)
     grade_label = _grade_gate(t["summary"], body.allow_planning)
     to_dem = lambda c: project_geometry(Point(c), "EPSG:4326", t["dem_crs"])  # noqa: E731
@@ -191,16 +214,28 @@ def create_swale(project_id: UUID, body: schemas.SwaleCreate, user: CurrentUser)
     sw = geo.Swale(max(parts, key=lambda p: p.length), sw.elevation_m, sw.end_offset_m)
     major = unary_union([g for g, p in layer_in(project_id, "flow", srid) if p.get("major")])
     m, notes = geo.swale_metrics(surface, sw, body.width_m, body.depth_m, boundary=boundary, major_flow=major)
-    n = fetch_one("SELECT count(*) AS n FROM design_elements WHERE project_id = :pid AND kind = 'swale'", pid=str(project_id))["n"]
-    label = f"S{n + 1}"
+    return SwalePlan(_to_lnglat(sw.geom, t["dem_crs"]), {**body.model_dump(), "terrain_grade": grade_label},
+                     {**m, "notes": notes, "berm": body.berm, "draft": grade_label != "design"})
+
+
+def save_swale(project_id: UUID, plan: SwalePlan) -> str:
     eid = str(uuid4())
-    execute(
-        """INSERT INTO design_elements (id, project_id, kind, label, geom, params, properties)
-           VALUES (:id, :pid, 'swale', :label, ST_SetSRID(ST_GeomFromWKB(:g), 4326), CAST(:params AS jsonb), CAST(:props AS jsonb))""",
-        id=eid, pid=str(project_id), label=label, g=wkb.dumps(_to_lnglat(sw.geom, t["dem_crs"])),
-        params=json.dumps({**body.model_dump(), "terrain_grade": grade_label}),
-        props=json.dumps({**m, "notes": notes, "berm": body.berm, "draft": grade_label != "design"}),
-    )
+    with transaction() as tx:
+        tx.execute("SELECT pg_advisory_xact_lock(hashtext(:k))", k=f"{project_id}:swales")
+        n = tx.fetch_one("SELECT count(*) AS n FROM design_elements WHERE project_id = :pid AND kind = 'swale'", pid=str(project_id))["n"]
+        tx.execute(
+            """INSERT INTO design_elements (id, project_id, kind, label, geom, params, properties)
+               VALUES (:id, :pid, 'swale', :label, ST_SetSRID(ST_GeomFromWKB(:g), 4326), CAST(:params AS jsonb), CAST(:props AS jsonb))""",
+            id=eid, pid=str(project_id), label=f"S{n + 1}", g=wkb.dumps(plan.geom_ll),
+            params=json.dumps(plan.params), props=json.dumps(plan.props),
+        )
+    return eid
+
+
+@router.post("/api/projects/{project_id}/design/swales", response_model=schemas.DesignFeature)
+def create_swale(project_id: UUID, body: schemas.SwaleCreate, user: CurrentUser):
+    _project_or_404(project_id, user)
+    eid = save_swale(project_id, plan_swale(project_id, body))
     return _feature(fetch_one(ELEMENT_SELECT + " WHERE id = :id", id=eid))
 
 

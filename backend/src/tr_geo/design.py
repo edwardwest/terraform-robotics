@@ -643,3 +643,59 @@ def valley_system(valleys: list[LineString], point: Point, max_dist: float = 30.
     from shapely.ops import unary_union
 
     return unary_union([valleys[i] for i in seen])
+
+
+def point_on_valley_at(surface: Surface, valley: LineString, keypoint: Point, rise_m: float, step: float | None = None) -> Point | None:
+    """The point on a valley line `rise_m` metres above (positive, upstream) or below (negative) the keypoint."""
+    step = step or surface.res
+    z0 = surface.z1(keypoint.x, keypoint.y)
+    target = z0 + rise_m
+    d0 = valley.project(keypoint)
+    sign = -1 if rise_m > 0 else 1  # valley lines run upstream → downstream, so upstream is toward d = 0
+    d = d0
+    prev_z = z0
+    while 0 <= d <= valley.length:
+        d += sign * step
+        p = valley.interpolate(min(max(d, 0), valley.length))
+        z = surface.z1(p.x, p.y)
+        if not np.isfinite(z):
+            return None
+        if (z - target) * (prev_z - target) <= 0:
+            return p
+        prev_z = z
+        if d <= 0 or d >= valley.length:
+            break
+    return None
+
+
+def contour_span(surface: Surface, center: Point, half_length_m: float) -> tuple[tuple[float, float], tuple[float, float]]:
+    """End points of a stretch of the contour through `center`, `half_length_m` either side of it."""
+    from skimage import measure
+
+    level = surface.z1(center.x, center.y)
+    if not np.isfinite(level):
+        raise ValueError("That point is outside the terrain model")
+    dem = surface.dem
+    w = half_length_m + 100
+    r0, c0 = dem.rowcol(np.array([center.x - w]), np.array([center.y + w]))
+    r1, c1 = dem.rowcol(np.array([center.x + w]), np.array([center.y - w]))
+    rows, cols = surface.elevation.shape
+    r0, c0 = max(int(r0[0]), 0), max(int(c0[0]), 0)
+    r1, c1 = min(int(r1[0]) + 2, rows), min(int(c1[0]) + 2, cols)
+    win = surface.elevation[r0:r1, c0:c1]
+    filled = np.where(np.isnan(win), np.nanmin(win) - 100, win)
+    best, best_d = None, np.inf
+    for coords in measure.find_contours(filled, level):
+        if len(coords) < 2:
+            continue
+        x, y = dem.xy(coords[:, 0] + r0, coords[:, 1] + c0)
+        ln = LineString(np.column_stack([x, y]))
+        dist = ln.distance(center)
+        if dist < best_d:
+            best, best_d = ln, dist
+    if best is None:
+        raise ValueError("No contour found at that point")
+    d = best.project(center)
+    a = best.interpolate(max(d - half_length_m, 0))
+    b = best.interpolate(min(d + half_length_m, best.length))
+    return (a.x, a.y), (b.x, b.y)

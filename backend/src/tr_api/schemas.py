@@ -231,3 +231,34 @@ class Parcel(BaseModel):
     acres: float | None
     boundary: dict[str, Any]
     source: str
+
+
+# ---- AI assistant ---------------------------------------------------------------------------------
+
+
+class AssistantMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=8000)
+
+
+class AssistantRequest(BaseModel):
+    messages: list[AssistantMessage] = Field(min_length=1, max_length=40)
+    allow_planning: bool = False
+
+
+class Proposal(BaseModel):
+    id: str
+    kind: Literal["keyline", "swale"]
+    params: dict[str, Any]
+    preview: dict[str, Any]
+    summary: dict[str, Any]
+    status: Literal["draft", "accepted", "discarded"]
+    created_at: datetime
+
+
+class AssistantReply(BaseModel):
+    reply: str
+    model: str
+    tool_log: list[dict[str, Any]]
+    proposals: list[Proposal]
+    citations: list[dict[str, Any]]

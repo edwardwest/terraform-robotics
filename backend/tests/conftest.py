@@ -87,3 +87,31 @@ def client(tmp_path_factory, signing_key):
     return c
 
 
+
+
+def make_terrain_project(client, tmp_path_factory, name="Design test"):
+    """A project on the synthetic two-valley terrain with a finished terrain job. Returns (id, boundary, terrain)."""
+    import time
+
+    from shapely.geometry import box, mapping
+
+    from tr_geo import project_geometry, write_geotiff
+
+    terrain = two_valley_terrain()
+    rows, cols = terrain.shape
+    x0, y0 = terrain.transform.c, terrain.transform.f
+    b = mapping(project_geometry(box(x0 + 15, y0 - rows + 15, x0 + cols - 15, y0 - 15), terrain.crs, "EPSG:4326"))
+    boundary = {"type": "Polygon", "coordinates": [[list(p) for p in b["coordinates"][0]]]}
+    pid = client.post("/api/projects", json={"name": name, "boundary": boundary}).json()["id"]
+    tif = tmp_path_factory.mktemp("dem") / "survey.tif"
+    write_geotiff(terrain, str(tif))
+    with open(tif, "rb") as f:
+        assert client.post(f"/api/projects/{pid}/surveys", data={"kind": "dem"}, files={"file": ("s.tif", f, "image/tiff")}).status_code == 201
+    job = client.post(f"/api/projects/{pid}/terrain-jobs", json={"contour_interval_m": 1.0}).json()
+    for _ in range(120):
+        job = client.get(f"/api/jobs/{job['id']}").json()
+        if job["status"] in ("succeeded", "failed"):
+            break
+        time.sleep(0.5)
+    assert job["status"] == "succeeded", job
+    return pid, boundary, terrain

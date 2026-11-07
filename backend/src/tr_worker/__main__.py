@@ -1,4 +1,4 @@
-"""Worker entry point: `tr-worker terrain <job_id>` (the Cloud Run Job's container command)."""
+"""Worker entry point: `tr-worker terrain <job_id>` (the Cloud Run Job's container command) or `tr-worker kb ...`."""
 
 import logging
 import sys
@@ -7,6 +7,10 @@ import sys
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     args = argv if argv is not None else sys.argv[1:]
+    if args and args[0] == "kb":
+        from tr_kb.ingest import main as kb_main
+
+        return kb_main(args[1:])
     if len(args) != 2 or args[0] != "terrain":
         print("usage: tr-worker terrain <job_id>", file=sys.stderr)
         return 2
