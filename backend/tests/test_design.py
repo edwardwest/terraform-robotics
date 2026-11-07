@@ -18,6 +18,7 @@ from tr_geo.design import (
     swale_metrics,
     swale_on_contour,
     valley_near,
+    valley_system,
 )
 
 
@@ -153,3 +154,15 @@ def test_swale_on_closed_contour_runs_start_to_end():
             continue
         s0, s1 = sw.geom.coords[0], sw.geom.coords[-1]
         assert np.hypot(s0[0] - start[0], s0[1] - start[1]) < np.hypot(s1[0] - start[0], s1[1] - start[1])
+
+
+def test_valley_system_joins_segments_across_confluences():
+    from shapely.geometry import LineString as L, Point as P
+
+    trunk_a = L([(0, 0), (0, 100)])
+    trunk_b = L([(0, 100), (0, 200)])
+    trib = L([(0, 100), (80, 160)])
+    other = L([(500, 0), (500, 200)])
+    sys = valley_system([trunk_a, trunk_b, trib, other], P(1, 50))
+    assert sys.length == pytest.approx(trunk_a.length + trunk_b.length + trib.length)
+    assert valley_system([other], P(0, 0)) is None

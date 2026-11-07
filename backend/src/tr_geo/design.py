@@ -402,11 +402,14 @@ def line_metrics(surface: Surface, line: LineString, valley: BaseGeometry | None
     }
 
 
+TOWARD_VALLEY = "Part of this line carries water back toward the valley."
+
+
 def check_rip(metrics: dict) -> list[str]:
     notes = []
     fall = metrics.get("fall_to_ridges_min")
     if fall is not None and fall < 0:
-        notes.append("Part of this line carries water back toward the valley.")
+        notes.append(TOWARD_VALLEY)
     steep = metrics.get("steepest_grade")
     if steep is not None and steep > RIP_GRADE_WARN:
         notes.append(f"Falls as steeply as 1:{max(int(round(1 / steep)), 1)} in places; watch for scour.")
@@ -573,3 +576,30 @@ def valley_near(valleys: list[LineString], point: Point, max_dist: float = 30.0)
     merged = ops.linemerge(MultiLineString(valleys)) if len(valleys) > 1 else valleys[0]
     best = min(_parts(merged), key=lambda ln: ln.distance(point))
     return best if best.distance(point) <= max_dist else None
+
+
+def valley_system(valleys: list[LineString], point: Point, max_dist: float = 30.0, tol: float = 1.0) -> BaseGeometry | None:
+    """Every valley segment connected (through confluences) to the one passing nearest `point`.
+
+    Valley lines are stored split at confluences, so the keypoint's own segment alone is too short to tell
+    which pattern lines belong to its valley.
+    """
+    if not valleys:
+        return None
+    start = min(range(len(valleys)), key=lambda i: valleys[i].distance(point))
+    if valleys[start].distance(point) > max_dist:
+        return None
+    from shapely.strtree import STRtree
+
+    tree = STRtree(valleys)
+    seen, todo = {start}, [start]
+    while todo:
+        i = todo.pop()
+        for j in tree.query(valleys[i].buffer(tol)):
+            j = int(j)
+            if j not in seen and valleys[j].distance(valleys[i]) <= tol:
+                seen.add(j)
+                todo.append(j)
+    from shapely.ops import unary_union
+
+    return unary_union([valleys[i] for i in seen])

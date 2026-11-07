@@ -93,12 +93,13 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
         keyline, arms = geo.keyline_through(surface, (kp.x, kp.y), body.grade, stops=stops, within=boundary, step=step)
     except ValueError as e:
         raise HTTPException(422, str(e))
-    valley = geo.valley_near(valleys, kp)
+    valley = geo.valley_near(valleys, kp)  # one merged line: seeds for graded lines
+    system = geo.valley_system(valleys, kp)  # the whole connected valley: which lines belong to it
     truncated = False
 
     if body.pattern == "parallel":
         lines = geo.parallel_pattern(surface, keyline, body.spacing_m, boundary, max_lines=body.max_lines,
-                                     valley=valley if body.extent == "valley" else None,
+                                     valley=system if body.extent == "valley" else None,
                                      ridges=ridges if body.extent == "valley" else None)
     elif body.pattern == "graded":
         if valley is None:
@@ -115,21 +116,22 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
     group_id = str(uuid4())
     params = {**body.model_dump(), "terrain_grade": grade_label}
     draft = grade_label != "design"
-    km = geo.line_metrics(surface, keyline, valley)
+    km = geo.line_metrics(surface, keyline, system or valley)
     rows = [_row(project_id, "keyline", f"Keyline {body.keypoint_id}", _to_lnglat(keyline, t["dem_crs"]), params,
                  {**km, "keypoint_id": body.keypoint_id, "draft": draft, "stops": [a.stop for a in arms]}, group_id)]
 
     # Rip lines are labelled top to bottom, which is also the default pass order.
     measured = []
     for pl in lines:
-        m = geo.line_metrics(surface, pl.geom, valley)
+        m = geo.line_metrics(surface, pl.geom, system or valley)
         measured.append((pl, m))
     measured.sort(key=lambda pm: -max(pm[1].get("z_start_m", 0), pm[1].get("z_end_m", 0)))
     notes_all: list[str] = []
-    flagged = 0
+    toward = steep = 0
     for i, (pl, m) in enumerate(measured, start=1):
         notes = geo.check_rip(m)
-        flagged += bool(notes)
+        toward += geo.TOWARD_VALLEY in notes
+        steep += any("scour" in n for n in notes)
         rows.append(_row(project_id, "rip", f"R{i}", _to_lnglat(pl.geom, t["dem_crs"]), params,
                          {**pl.props, **m, "pass": i, "notes": notes, "draft": draft}, group_id))
     # Replace this keypoint's previous pattern in one transaction, so a failure leaves the old one intact.
@@ -142,8 +144,11 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
     treated = 0.0
     if measured:
         treated = unary_union([pl.geom.buffer(body.spacing_m / 2, cap_style="flat") for pl, _ in measured]).intersection(boundary).area
-    if flagged:
-        notes_all.append(f"{flagged} of {len(measured)} rip lines have notes (water toward the valley or steep fall).")
+    if toward:
+        notes_all.append(f"{toward} of {len(measured)} rip lines carry some water back toward the valley.")
+    if steep:
+        notes_all.append(f"{steep} of {len(measured)} rip lines fall steeper than 1:100 somewhere; watch for scour. "
+                         "On steep ground, 'Each line graded' keeps every line at the design grade.")
     if draft:
         notes_all.append("Draft on planning-grade terrain: confirm with a field survey before ripping.")
     if truncated:
