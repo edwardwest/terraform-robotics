@@ -15,6 +15,7 @@ Terraform Robotics: site survey → terrain model → regenerative design. See R
 - Designs on planning-grade terrain need `allow_planning` and are stored and exported as drafts; coarse terrain is refused.
 - Terrain caches (DEM, smoothed surface, slope tiles, GCS downloads) are keyed by the terrain job id; keep it that way, since `dem.tif` is rewritten in place on re-runs.
 - New SQL files must be idempotent; apply them in Cloud with `infra/gcp/migrate.sh` (never re-run `setup.sh` just to migrate: it rotates the DB password).
+- Knowledge base: `infra/gcp/kb.sh` (Cloud Run Job) for rules/plants; NRCS standards only from Cloud Shell via `infra/gcp/kb-local.sh` (eFOTG blocks Cloud Run). Crawl with the honest `TerraformRobotics-KB` user agent; never spoof a browser or route around a block.
 - Prefer open-source libraries and free public data until the proof of concept is done.
 
 ## Commands

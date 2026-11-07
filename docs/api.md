@@ -145,7 +145,7 @@ All return a file download: `GET /api/projects/{id}/export/geojson`, `/export/sh
 
 `GET /api/species?q=&growth_habit=&nitrogen_fixing=&drought_tolerance=&shade_tolerance=&min_temp_f_at_most=&limit=` → USDA PLANTS species with traits.
 
-Ingestion runs in the cloud: `tr-worker kb rules|nrcs|plants|all` (see `infra/gcp/kb.sh`).
+Ingestion: `tr-worker kb rules|nrcs|plants|all [--limit N] [--state CA]`. Rules and plants run as the `kb-ingest` Cloud Run Job (`infra/gcp/kb.sh`). NRCS practice standards come from eFOTG (the state's adopted standards, default CA); eFOTG refuses Cloud Run's network and nrcs.usda.gov refuses Google Cloud entirely, so run that source from Cloud Shell with `infra/gcp/kb-local.sh PROJECT us-west1 nrcs`. Plants come from the EOL export of USDA PLANTS on Zenodo (about 31,700 taxa; about 2,000 with full PLANTS characteristics).
 
 ## Design assistant (W9)
 
