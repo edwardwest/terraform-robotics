@@ -222,12 +222,41 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  /* Fit the viewport so the Continue button stays on screen; the list scrolls instead. */
+  max-height: calc(100vh - var(--header-h) - var(--space-3) * 2);
+}
+
+.planCount {
+  color: var(--fg-1);
+}
+
+.planFoot {
+  flex-shrink: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.next {
+  width: 100%;
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .planList {
   list-style: none;
   margin: 0;
   padding: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -253,6 +282,14 @@
 
   .side {
     position: static;
+  }
+
+  .planCard {
+    max-height: none;
+  }
+
+  .planList {
+    max-height: 240px;
   }
 }
 

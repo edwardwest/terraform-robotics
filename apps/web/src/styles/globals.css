@@ -32,7 +32,8 @@ body {
   font-size: 15px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /* clip, not hidden: hidden makes body a scroll container, which silently breaks position: sticky. */
+  overflow-x: clip;
 }
 
 h1, h2, h3, h4, p {

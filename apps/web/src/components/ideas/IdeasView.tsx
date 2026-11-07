@@ -177,11 +177,26 @@ export function IdeasView({ projectId }: { projectId: string }) {
             </section>
           );
         })}
+
+        {recs && (
+          <footer className={styles.foot}>
+            <span className="app-small">
+              {planList.length === 0
+                ? "Add the ideas you want, then lay them out in build order."
+                : `${planList.length} idea${planList.length === 1 ? "" : "s"} in your plan. The Design step puts them in build order.`}
+            </span>
+            <Link href={`/projects/${projectId}/design`} className="btn btn-primary">
+              Continue to design <IconArrowRight />
+            </Link>
+          </footer>
+        )}
       </div>
 
       <aside className={styles.side} aria-labelledby="plan-h">
         <div className={`card ${styles.planCard}`}>
-          <p className="app-eyebrow" id="plan-h">Your plan</p>
+          <p className="app-eyebrow" id="plan-h">
+            Your plan{planList.length > 0 && <span className={styles.planCount}> · {planList.length}</span>}
+          </p>
           {planList.length === 0 ? (
             <p className="app-small">Nothing yet. Use Add to plan on the ideas you want.</p>
           ) : (
@@ -196,9 +211,11 @@ export function IdeasView({ projectId }: { projectId: string }) {
               ))}
             </ul>
           )}
-          <Link href={`/projects/${projectId}/design`} className="btn btn-primary">
-            Continue to design <IconArrowRight />
-          </Link>
+          <div className={styles.planFoot}>
+            <Link href={`/projects/${projectId}/design`} className={`btn btn-primary ${styles.next}`}>
+              Continue to design <IconArrowRight />
+            </Link>
+          </div>
         </div>
       </aside>
     </div>
