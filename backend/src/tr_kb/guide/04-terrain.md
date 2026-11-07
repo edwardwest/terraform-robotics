@@ -1,13 +1,13 @@
-# Step 3: Terrain ("Where the water goes.")
+# Step 4: Terrain ("Where the water goes.")
 
-**What it's for:** reading how water moves across the land, and confirming the keypoints that will anchor the keyline design.
+**What it's for:** reading how water moves across the land, and confirming the keypoints that anchor any keyline or swale design.
 
 **What's on screen**
 - **Layers** (left): Contours, Flow paths, Valleys, Ridges, Keypoints, Hillshade, Slope. Hillshade and Slope appear after the terrain model is built. The **Legend** explains each line style; turning on Slope adds slope classes from under 5% to over 35%.
 - **Map** (center): the terrain inside the boundary. **Draw section** cuts a line across the land: choose it, then click a start and an end point, and the **Section profile** below the map shows the ground along that line. **Aerial** switches the base map. **Tilt to 3D** shows the land in relief; drag to orbit, right-drag or Shift-drag to pan.
 - **Terrain summary** (right): elevation range, mean slope, main valleys, where water leaves the site, and the DEM resolution (cell size).
 - **Keypoints** (right): each keypoint (K1, K2…) with its elevation and score, a **Confirm** button, and a count of how many are confirmed. Clicking a keypoint on the map selects it.
-- **Design keylines** goes to the Design step. The design step starts from the keypoints you confirm.
+- **See ideas** goes to the Ideas step, which now checks slope and valleys against the terrain model. The Design step's keyline tool starts from the keypoints you confirm.
 
 **How to read the numbers**
 - **Elevation range:** highest minus lowest ground inside the boundary.
@@ -25,4 +25,4 @@
 - No keypoints found: the valleys may be too short inside the boundary, or the data too coarse.
 - Keypoints in odd places: often planning-grade data. Better survey data usually fixes it.
 
-**When to move on:** after confirming the keypoints you trust, choose Design keylines.
+**When to move on:** after confirming the keypoints you trust, choose See ideas.

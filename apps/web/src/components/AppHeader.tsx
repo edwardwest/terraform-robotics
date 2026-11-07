@@ -2,23 +2,16 @@
 import Link from "next/link";
 import { Show, UserButton } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
+import { STEPS, STEP_PATH, stepOf } from "@/lib/steps";
 import { AssistantButton } from "./assistant/AssistantDock";
 import styles from "./AppHeader.module.css";
 
-const STEPS = [
-  { n: 1, label: "Site", seg: "site" },
-  { n: 2, label: "Survey", seg: "survey" },
-  { n: 3, label: "Terrain", seg: "terrain" },
-  { n: 4, label: "Design", seg: "design" },
-  { n: 5, label: "Estimate", seg: "estimate" },
-] as const;
-
 export function AppHeader() {
   const path = usePathname() || "/";
-  const m = path.match(/^\/projects\/([^/]+)\/(site|survey|terrain|design|estimate|export)/);
+  const m = path.match(STEP_PATH);
   const isNew = path === "/projects/new";
   const projectId = m && m[1] !== "new" ? m[1] : null;
-  const current = isNew ? "site" : m?.[2] === "export" ? "estimate" : m?.[2] ?? null;
+  const current = isNew ? "site" : stepOf(m?.[2]);
   const showSteps = isNew || !!projectId;
 
   return (
@@ -29,12 +22,12 @@ export function AppHeader() {
       {showSteps && (
         <nav aria-label="Project steps" className={styles.nav}>
           <ol className={styles.steps}>
-            {STEPS.map((s) => {
+            {STEPS.map((s, i) => {
               const active = s.seg === current;
               const href = projectId ? `/projects/${projectId}/${s.seg}` : null;
               const content = (
                 <>
-                  <span className={styles.num}>{s.n}</span>
+                  <span className={styles.num}>{i + 1}</span>
                   <span className={styles.label}>{s.label}</span>
                 </>
               );

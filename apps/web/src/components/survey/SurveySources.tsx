@@ -1,4 +1,5 @@
 "use client";
+import { stepCount } from "@/lib/steps";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, jobStore, type Project, type Survey, type SurveyKind, type TerrainSummary } from "@/lib/api";
@@ -172,7 +173,7 @@ export function SurveySources({ projectId }: { projectId: string }) {
       <div className={styles.main}>
         <header className={styles.intro}>
           <p className="app-eyebrow">
-            {project ? `${project.name} · ${formatAcres(project.area_m2)} acres · ` : ""}Step 2 of 5
+            {project ? `${project.name} · ${formatAcres(project.area_m2)} acres · ` : ""}{stepCount("survey")}
           </p>
           <h1 className="app-display">Bring the best ground data you have.</h1>
           <p className="app-body">

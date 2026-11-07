@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { api, exportUrl, type CostItem, type Estimate, type Project } from "@/lib/api";
 import { IconAlert, IconArrowLeft, IconArrowRight, IconDownload } from "../Icons";
 import { useAssistantPage } from "@/lib/assistant";
+import { stepCount } from "@/lib/steps";
 import styles from "./Estimate.module.css";
 
 const usd = (n: number, digits = 0) =>
@@ -85,7 +86,7 @@ export function EstimateView({ projectId }: { projectId: string }) {
   useAssistantPage("estimate", {
     page: "Estimate",
     line_item_count: estimate ? estimate.lines.length : null,
-    lines: estimate?.lines.map((ln) => ({ label: ln.label, quantity: ln.quantity, unit: ln.unit,
+    lines: estimate?.lines.map((ln) => ({ label: ln.label, group: ln.group, quantity: ln.quantity, unit: ln.unit,
       total_usd: [Math.round(ln.total_low), Math.round(ln.total_high)], custom_rate: !!costs[ln.item]?.custom })),
     total_usd: estimate ? [Math.round(estimate.total_low), Math.round(estimate.total_high)] : null,
     contingency_pct: contingency,
@@ -96,15 +97,15 @@ export function EstimateView({ projectId }: { projectId: string }) {
   return (
     <div className={styles.layout}>
       <header className={styles.head}>
-        <p className="app-eyebrow">{project ? `${project.name} · ` : ""}Step 5 of 5 · Estimate</p>
-        <h1 className="app-display">What it costs to rehydrate this land.</h1>
+        <p className="app-eyebrow">{project ? `${project.name} · ` : ""}{stepCount("estimate")} · Estimate</p>
+        <h1 className="app-display">What it costs to build.</h1>
       </header>
 
       <aside className={styles.side}>
         <section className={`card ${styles.total}`} aria-labelledby="total">
           <p className="app-eyebrow" id="total">Total build estimate</p>
           <p className={styles.big}>{estimate ? range(estimate.total_low, estimate.total_high) : "—"}</p>
-          <p className="app-small">Earthworks, layout and design, with contingency.</p>
+          <p className="app-small">Computed earthworks, planning allowances for the rest of your plan, design and contingency.</p>
           {estimate?.draft && (
             <p className={`app-small ${styles.draft}`}><IconAlert size={12} /> Design is a draft on planning-grade terrain.</p>
           )}
@@ -136,7 +137,7 @@ export function EstimateView({ projectId }: { projectId: string }) {
         <div className={styles.itemsHead}>
           <div>
             <p className="app-eyebrow" id="items">Line items</p>
-            <p className="app-small">Quantities computed from the design geometry.</p>
+            <p className="app-small">Design quantities come from the geometry; plan quantities from the Ideas step.</p>
           </div>
           {!editing ? (
             <button type="button" className="btn btn-sm" onClick={startEdit} disabled={!estimate}>Edit unit costs</button>
@@ -149,7 +150,10 @@ export function EstimateView({ projectId }: { projectId: string }) {
         </div>
         {error && <p className="error-text" role="alert">{error}</p>}
         {empty && (
-          <p className="app-body">No design elements yet. <Link href={`/projects/${projectId}/design`}>Lay out keylines or swales</Link> first.</p>
+          <p className="app-body">
+            Nothing to estimate yet. <Link href={`/projects/${projectId}/ideas`}>Add interventions to your plan</Link> or{" "}
+            <Link href={`/projects/${projectId}/design`}>lay out keylines or swales</Link> first.
+          </p>
         )}
         {estimate && !empty && (
           <table className={styles.table}>
@@ -157,10 +161,20 @@ export function EstimateView({ projectId }: { projectId: string }) {
               <tr><th>Item</th><th>Quantity</th><th>Unit cost</th><th className={styles.right}>Total</th></tr>
             </thead>
             <tbody>
-              {estimate.lines.map((ln) => {
+              {estimate.lines.map((ln, i) => {
                 const c = costs[ln.item];
+                const groupStart = ln.group === "plan" && estimate.lines[i - 1]?.group !== "plan";
                 return (
-                  <tr key={ln.item}>
+                  <Fragment key={ln.item}>
+                  {groupStart && (
+                    <tr className={styles.groupRow}>
+                      <td colSpan={4}>
+                        <span className={styles.itemLabel}>Planning allowances</span>
+                        <span className="app-small">Wide starter ranges for interventions the design tools don&apos;t compute. Replace with local quotes.</span>
+                      </td>
+                    </tr>
+                  )}
+                  <tr>
                     <td>
                       <span className={styles.itemLabel}>{ln.label}</span>
                       <span className="app-small">{ln.basis}</span>
@@ -185,6 +199,7 @@ export function EstimateView({ projectId }: { projectId: string }) {
                     </td>
                     <td className={styles.right}>{range(ln.total_low, ln.total_high)}</td>
                   </tr>
+                  </Fragment>
                 );
               })}
             </tbody>

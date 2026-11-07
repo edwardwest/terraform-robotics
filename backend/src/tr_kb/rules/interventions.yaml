@@ -1,0 +1,592 @@
+# Intervention catalog: the landscape interventions the app can suggest, and what each needs from a site.
+#
+# The recommender (tr_kb/interventions.py) ranks these against a project's goals brief and site facts. It is plain
+# code: no model chooses or scores. Every reason it shows comes from the fields below.
+#
+# Fields
+#   goals:       goal id -> how strongly the intervention serves it (1 some, 2 well, 3 a main purpose)
+#   phase:       where it sits on P.A. Yeomans' scale of landscape permanence (`phases` below). Plans are
+#                sequenced in this order: water and access before trees, buildings, fencing and soil.
+#   topics:      PINA core-curriculum topics (topics.yaml)
+#   conditions:  area_m2 [min, max], slope_pct [min, max] (site mean slope), rainfall_mm [min, max]; any bound may
+#                be null. Outside a range is a soft concern, except `requires`, which is a hard requirement.
+#   requires:    terrain (needs the terrain model), valley (a main valley or keypoint), creek (a creek or spring on
+#                the land), buildings (a roof or house on site)
+#   maintenance: low | medium | high
+#   cost_tier:   1 under ~$5k, 2 ~$5-25k, 3 ~$25-100k, 4 over ~$100k for a typical project at the stated scale
+#   nrcs:        NRCS conservation practice codes (National Handbook of Conservation Practices). These are the
+#                closest standard, not an endorsement that the practice as described meets it. Verify against the
+#                state's adopted list in eFOTG.
+#   rules:       Terraform Robotics design rules (design_rules.yaml)
+#   references:  further-reading ids (references.yaml)
+#   tool:        an app design tool that lays it out from the terrain model (keyline | swale); otherwise it is a
+#                planning allowance in the estimate
+#   quantity:    basis (area_m2 | length_m | volume_m3 | count) and a starter default, in metric
+#   cost_item:   cost library item (sql/006_interventions.sql) for the planning allowance
+#   cautions:    permits, legal and safety points shown with the suggestion. California-focused for now.
+version: "0.1"
+
+goals:
+  - id: water_security
+    label: Store and save water
+    hint: Catch rain, hold it in the soil and in storage, use less from the well or the mains.
+  - id: erosion
+    label: Stop erosion
+    hint: Heal gullies, slow runoff and keep topsoil in place.
+  - id: fire
+    label: Reduce wildfire risk
+    hint: Defensible space, fuel breaks, access and water for firefighting.
+  - id: food
+    label: Grow food
+    hint: Gardens, orchards and food forests for the household or for sale.
+  - id: soil
+    label: Build soil health
+    hint: More organic matter, life and water-holding capacity in the soil.
+  - id: habitat
+    label: Habitat and biodiversity
+    hint: Native plants, pollinators, wildlife corridors and creek health.
+  - id: livestock
+    label: Raise animals
+    hint: Poultry, grazing and the water and fencing they need.
+  - id: income
+    label: Farm income
+    hint: Interventions that support a farm business.
+  - id: shelter
+    label: Shade, wind and comfort
+    hint: Cooler summers, calmer winds and pleasant places to be outside.
+  - id: flood
+    label: Manage stormwater
+    hint: Slow, spread and sink runoff from roofs, roads and slopes.
+
+phases:
+  - id: water
+    label: Water
+  - id: access
+    label: Access
+  - id: trees
+    label: Trees
+  - id: structures
+    label: Buildings
+  - id: subdivision
+    label: Fencing and paddocks
+  - id: soil
+    label: Soil
+
+categories:
+  - id: water
+    label: Water
+  - id: earthworks
+    label: Earthworks
+  - id: soil
+    label: Soil
+  - id: plants
+    label: Plants and trees
+  - id: fire
+    label: Fire
+  - id: animals
+    label: Animals
+  - id: structures
+    label: Structures and access
+
+# Answer options for the goals brief. The API validates against these and the web app shows their labels.
+questions:
+  setting:
+    - {id: urban_lot, label: "Town or city lot"}
+    - {id: home_acreage, label: "Home on acreage"}
+    - {id: small_farm, label: "Small farm"}
+    - {id: ranch, label: "Ranch or grazing land"}
+    - {id: orchard_vineyard, label: "Orchard or vineyard"}
+    - {id: wildland, label: "Woodland or wildland"}
+  budget:
+    - {id: under_5k, label: "Under $5,000"}
+    - {id: 5k_25k, label: "$5,000 to $25,000"}
+    - {id: 25k_100k, label: "$25,000 to $100,000"}
+    - {id: over_100k, label: "Over $100,000"}
+    - {id: unsure, label: "Not sure yet"}
+  timeline:
+    - {id: this_season, label: "This season"}
+    - {id: 1_2_years, label: "Next year or two"}
+    - {id: 3_5_years, label: "Three to five years"}
+    - {id: long_term, label: "Long term, in phases"}
+  maintenance:
+    - {id: low, label: "Low, set it and leave it"}
+    - {id: medium, label: "Medium, a few days a season"}
+    - {id: high, label: "High, regular hands-on work"}
+  water_sources:
+    - {id: rain_only, label: "Rain only"}
+    - {id: well, label: "Well"}
+    - {id: municipal, label: "Municipal water"}
+    - {id: irrigation_district, label: "Irrigation district"}
+    - {id: creek_spring, label: "Creek or spring on the land"}
+  constraints:
+    - {id: renting, label: "We rent or lease the land"}
+    - {id: hoa, label: "HOA or neighborhood rules"}
+    - {id: limited_machinery, label: "Machinery can't easily get in"}
+    - {id: sensitive_habitat, label: "Creek, wetland or protected habitat on site"}
+    - {id: tight_permits, label: "Strict county permitting"}
+
+interventions:
+  # ---------------------------------------------------------------- Water
+  - id: roof-catchment
+    title: Roof rainwater catchment
+    category: water
+    phase: water
+    summary: >
+      Gutters, a first-flush diverter and tanks store roof runoff for irrigation, animals or firefighting. A roof
+      sheds about 0.6 gallons per square foot for every inch of rain, so even a small roof fills a tank quickly in a
+      wet winter.
+    goals: {water_security: 3, flood: 1, fire: 1, food: 1}
+    topics: [water, home_system]
+    requires: [buildings]
+    maintenance: low
+    cost_tier: 1
+    nrcs: ["558", "636"]
+    references: [lancaster-rainwater-v1, oaec-water-publications]
+    quantity: {basis: volume_m3, default: 9.5}
+    cost_item: tank_gal
+    cautions:
+      - In California, tanks on the ground of 5,000 gallons or less are usually exempt from a building permit; larger or elevated tanks need one. Check with the county.
+      - Screen inlets and overflows against mosquitoes.
+
+  - id: greywater-laundry
+    title: Laundry-to-landscape greywater
+    category: water
+    phase: water
+    summary: >
+      Sends washing-machine water by gravity to mulch basins around trees and shrubs. Cheap, simple and one of the
+      quickest ways to cut outdoor water use at a house.
+    goals: {water_security: 2, food: 1}
+    topics: [water, home_system, waste_bioremediation]
+    requires: [buildings]
+    conditions: {area_m2: [null, 40000]}
+    maintenance: low
+    cost_tier: 1
+    references: [oaec-water-publications, lancaster-rainwater-v1]
+    quantity: {basis: count, default: 1}
+    cost_item: greywater_each
+    cautions:
+      - California's plumbing code allows a simple clothes-washer system without a construction permit when it meets the code's conditions; other greywater systems need a permit. Check local rules.
+      - Use plant-friendly detergents (low salt, no boron).
+
+  - id: rain-garden
+    title: Rain garden
+    category: water
+    phase: water
+    summary: >
+      A shallow planted basin that takes runoff from a roof, driveway or path and lets it soak in within a day or
+      two. Turns a drainage problem into a garden bed.
+    goals: {flood: 3, water_security: 1, habitat: 1}
+    topics: [water, urban, home_system]
+    conditions: {slope_pct: [null, 12]}
+    maintenance: low
+    cost_tier: 1
+    references: [lancaster-rainwater-v1]
+    quantity: {basis: area_m2, default: 10}
+    cost_item: rain_garden_sqft
+    cautions:
+      - Keep it at least 10 feet from foundations and away from septic fields.
+
+  - id: swale
+    title: Swale on contour
+    category: earthworks
+    phase: water
+    summary: >
+      A dead-level ditch with a berm on the downhill side that stops runoff, spreads it along the contour and lets it
+      soak in. Usually planted with trees on the berm. The Design step lays swales out from the terrain model.
+    goals: {water_security: 2, erosion: 2, flood: 2, food: 1}
+    topics: [water, earthworks, broad_scale]
+    requires: [terrain]
+    conditions: {area_m2: [1000, null], slope_pct: [1, 15], rainfall_mm: [200, 1500]}
+    maintenance: medium
+    cost_tier: 2
+    rules: [swale-level, swale-slope, swale-sizing, flow-crossing, setback]
+    references: [osu-water-microlearning, osu-water-management-course, lancaster-rainwater-v1]
+    tool: swale
+    cautions:
+      - On steep ground or unstable soils a swale can saturate the slope; have an engineer look at anything above 15% slope.
+      - Give every swale a stable, level spillway for storms bigger than it holds.
+
+  - id: keyline
+    title: Keyline pattern
+    category: earthworks
+    phase: water
+    summary: >
+      Subsoil ripping laid slightly off contour from a keypoint, so water that would gather in the valleys is moved
+      toward the drier ridges and held in the soil. Suits grazing and cropping land with clear valleys and ridges.
+      The Design step computes the pattern from the terrain model.
+    goals: {water_security: 3, soil: 2, erosion: 2, livestock: 1, income: 1}
+    topics: [water, soils, broad_scale]
+    requires: [terrain, valley]
+    conditions: {area_m2: [20000, null], slope_pct: [2, 20]}
+    maintenance: low
+    cost_tier: 2
+    rules: [keypoint, keyline-grade, keyline-pattern, keyline-stops, rip-timing]
+    references: [keyline-wolf-gulch, keyline-seven-seeds, osu-water-management-course]
+    tool: keyline
+    cautions:
+      - Rip when the soil is moist but not wet, and seed or graze right after so the rip lines don't erode.
+
+  - id: pond
+    title: Farm pond
+    category: earthworks
+    phase: water
+    summary: >
+      Stores runoff for livestock, irrigation, firefighting and wildlife. Best sited high in the landscape at or
+      above a keypoint, where it can feed water downhill by gravity.
+    goals: {water_security: 3, livestock: 2, habitat: 2, fire: 2}
+    topics: [water, earthworks, aquaculture]
+    requires: [terrain]
+    conditions: {area_m2: [8000, null], slope_pct: [1, 15], rainfall_mm: [250, null]}
+    maintenance: medium
+    cost_tier: 3
+    nrcs: ["378"]
+    rules: [pond-siting, setback]
+    references: [osu-water-management-course, osu-intro-permaculture]
+    quantity: {basis: count, default: 1}
+    cost_item: pond_each
+    cautions:
+      - Storing water from a stream or watercourse in California generally needs a water right or a small domestic or stockpond registration with the State Water Resources Control Board.
+      - Larger dams are regulated by the state Division of Safety of Dams. Have an engineer design the dam and spillway.
+
+  - id: check-dams
+    title: Check dams and gully repair
+    category: earthworks
+    phase: water
+    summary: >
+      Low rock structures (one-rock dams, rock rundowns) placed across a small gully to slow the water, catch
+      sediment and let plants recolonize the channel. Hand work with local rock.
+    goals: {erosion: 3, water_security: 1, habitat: 1}
+    topics: [water, earthworks, design_for_catastrophe]
+    conditions: {slope_pct: [3, null]}
+    maintenance: low
+    cost_tier: 1
+    nrcs: ["410"]
+    references: [oaec-pdc, lancaster-rainwater-v1]
+    quantity: {basis: count, default: 6}
+    cost_item: check_dam_each
+    cautions:
+      - Work in a defined stream channel can need a Lake or Streambed Alteration Agreement from California Fish and Wildlife.
+
+  # ---------------------------------------------------------------- Soil
+  - id: sheet-mulch
+    title: Sheet mulching
+    category: soil
+    phase: soil
+    summary: >
+      Cardboard topped with compost and a thick layer of wood chips smothers lawn or weeds and builds soil in place,
+      ready to plant through. The fastest way to start a garden or food forest on turf.
+    goals: {soil: 3, food: 2, water_security: 1}
+    topics: [soils, home_system]
+    conditions: {area_m2: [null, 4000], slope_pct: [null, 25]}
+    maintenance: low
+    cost_tier: 1
+    nrcs: ["484"]
+    references: [oaec-pdc, jeavons-grow-more-vegetables, bloom-boehnlein-practical-permaculture]
+    quantity: {basis: area_m2, default: 100}
+    cost_item: sheet_mulch_sqft
+    cautions:
+      - In fire-prone areas keep wood-chip mulch out of the first 5 feet around buildings.
+
+  - id: cover-crop
+    title: Cover crops
+    category: soil
+    phase: soil
+    summary: >
+      A seeded mix of grasses, legumes and broadleaves grown between cash crops or in orchard rows to protect the
+      soil, feed soil life and fix nitrogen.
+    goals: {soil: 3, erosion: 2, habitat: 1, income: 1, food: 1}
+    topics: [soils, broad_scale]
+    conditions: {area_m2: [400, null], slope_pct: [null, 30]}
+    maintenance: medium
+    cost_tier: 1
+    nrcs: ["340"]
+    references: [osu-intro-permaculture]
+    quantity: {basis: area_m2, default: 4047}
+    cost_item: cover_crop_acre
+
+  - id: compost-application
+    title: Compost on pasture and fields
+    category: soil
+    phase: soil
+    summary: >
+      A thin layer of quality compost spread on rangeland or cropland. A one-time application can raise forage growth
+      and soil carbon for years; California's Healthy Soils Program has funded it.
+    goals: {soil: 3, livestock: 1, income: 1, water_security: 1}
+    topics: [soils, broad_scale]
+    conditions: {area_m2: [4000, null], slope_pct: [null, 25]}
+    maintenance: low
+    cost_tier: 2
+    nrcs: ["808"]
+    references: [osu-intro-permaculture]
+    quantity: {basis: area_m2, default: 8094}
+    cost_item: compost_acre
+
+  - id: compost-system
+    title: On-site composting
+    category: soil
+    phase: soil
+    summary: >
+      Bins or windrows that turn kitchen, garden and animal waste into compost for the garden. Closes the nutrient
+      loop on site.
+    goals: {soil: 3, food: 2}
+    topics: [soils, waste_bioremediation, home_system]
+    maintenance: medium
+    cost_tier: 1
+    nrcs: ["317"]
+    references: [jeavons-grow-more-vegetables, oaec-pdc]
+    quantity: {basis: count, default: 1}
+    cost_item: compost_each
+
+  # ---------------------------------------------------------------- Plants and trees
+  - id: kitchen-garden
+    title: Kitchen garden
+    category: plants
+    phase: soil
+    summary: >
+      Annual vegetable and herb beds close to the house (zone 1), where they are easy to tend, water and harvest
+      every day.
+    goals: {food: 3, soil: 1}
+    topics: [home_system, soils]
+    conditions: {area_m2: [null, null], slope_pct: [null, 15]}
+    maintenance: high
+    cost_tier: 1
+    references: [jeavons-grow-more-vegetables, bloom-boehnlein-practical-permaculture]
+    quantity: {basis: area_m2, default: 40}
+    cost_item: garden_sqft
+
+  - id: food-forest
+    title: Food forest or orchard guild
+    category: plants
+    phase: trees
+    summary: >
+      Fruit and nut trees underplanted with shrubs, herbs and groundcovers that fix nitrogen, attract pollinators and
+      mulch the soil. Heavy work for the first three years, then largely self-sustaining.
+    goals: {food: 3, habitat: 2, shelter: 1, income: 1, soil: 1}
+    topics: [trees_forests, home_system]
+    conditions: {area_m2: [100, null], slope_pct: [null, 30]}
+    maintenance: high
+    cost_tier: 2
+    nrcs: ["612"]
+    references: [osu-pdc-syllabus, oaec-pdc, bloom-boehnlein-practical-permaculture]
+    quantity: {basis: area_m2, default: 1000}
+    cost_item: food_forest_acre
+    cautions:
+      - Plan irrigation for the first few summers in a Mediterranean climate.
+
+  - id: shade-trees
+    title: Shade trees for the house and yard
+    category: plants
+    phase: trees
+    summary: >
+      Deciduous trees on the south and west sides of buildings shade walls and windows in summer and let the sun in
+      during winter. Cuts cooling load and evaporation from gardens.
+    goals: {shelter: 3, water_security: 1, habitat: 1, food: 1}
+    topics: [climates_microclimates, trees_forests, home_system]
+    requires: [buildings]
+    maintenance: low
+    cost_tier: 1
+    nrcs: ["612"]
+    references: [osu-intro-permaculture]
+    quantity: {basis: count, default: 4}
+    cost_item: tree_each
+    cautions:
+      - In fire-prone areas keep tree canopies at least 10 feet from roofs and chimneys and follow defensible-space spacing.
+
+  - id: windbreak
+    title: Windbreak
+    category: plants
+    phase: trees
+    summary: >
+      Rows of trees and shrubs across the prevailing wind. Shelters gardens, animals and buildings for a distance of
+      roughly ten times the windbreak's height.
+    goals: {shelter: 3, habitat: 2, livestock: 1, erosion: 1, food: 1}
+    topics: [trees_forests, climates_microclimates, broad_scale]
+    conditions: {area_m2: [2000, null]}
+    maintenance: medium
+    cost_tier: 2
+    nrcs: ["380"]
+    references: [osu-intro-permaculture, osu-design-climate-resilience]
+    quantity: {basis: length_m, default: 100}
+    cost_item: windbreak_ft
+    cautions:
+      - In wildfire country, choose less flammable species and keep windbreaks out of the 100 feet of defensible space around buildings.
+
+  - id: hedgerow
+    title: Hedgerow
+    category: plants
+    phase: trees
+    summary: >
+      A mixed native hedge along a field edge, fence or road. Hosts pollinators and beneficial insects, slows wind and
+      runoff, and links habitat across the property.
+    goals: {habitat: 3, erosion: 1, shelter: 1, food: 1}
+    topics: [trees_forests, local_ecosystem, broad_scale]
+    conditions: {area_m2: [1000, null]}
+    maintenance: medium
+    cost_tier: 1
+    nrcs: ["422"]
+    references: [oaec-pdc]
+    quantity: {basis: length_m, default: 100}
+    cost_item: hedgerow_ft
+
+  - id: pollinator-meadow
+    title: Pollinator meadow
+    category: plants
+    phase: soil
+    summary: >
+      Native wildflowers and bunchgrasses replacing lawn or weedy ground. Feeds pollinators, holds soil and needs
+      little water once established.
+    goals: {habitat: 3, soil: 1, erosion: 1, water_security: 1}
+    topics: [local_ecosystem, soils]
+    conditions: {area_m2: [100, null]}
+    maintenance: low
+    cost_tier: 1
+    nrcs: ["327"]
+    references: [oaec-pdc]
+    quantity: {basis: area_m2, default: 2023}
+    cost_item: pollinator_acre
+
+  - id: riparian-buffer
+    title: Creek-side planting
+    category: plants
+    phase: trees
+    summary: >
+      Native trees, shrubs and grasses along a creek or spring run. Shades and cools the water, holds the banks and
+      filters runoff before it reaches the channel.
+    goals: {habitat: 3, erosion: 3, flood: 2, water_security: 1}
+    topics: [local_ecosystem, water, trees_forests]
+    requires: [creek]
+    maintenance: medium
+    cost_tier: 2
+    nrcs: ["391"]
+    references: [osu-intro-permaculture, oaec-pdc]
+    quantity: {basis: area_m2, default: 4047}
+    cost_item: riparian_acre
+    cautions:
+      - Work at the bank or in the channel can need a Lake or Streambed Alteration Agreement from California Fish and Wildlife, and many counties set riparian setbacks.
+
+  # ---------------------------------------------------------------- Fire
+  - id: defensible-space
+    title: Defensible space
+    category: fire
+    phase: access
+    summary: >
+      Clearing and thinning in zones around buildings: lean, clean and green within 30 feet, reduced fuel out to 100
+      feet. The single most effective step for protecting a home from wildfire.
+    goals: {fire: 3}
+    topics: [design_for_catastrophe, home_system]
+    requires: [buildings]
+    maintenance: medium
+    cost_tier: 1
+    references: [osu-design-climate-resilience, oaec-pdc]
+    quantity: {basis: area_m2, default: 4047}
+    cost_item: fuel_reduction_acre
+    cautions:
+      - California requires 100 feet of defensible space (or to the property line) around buildings in State Responsibility Areas and Very High Fire Hazard Severity Zones; see CAL FIRE's guidance.
+
+  - id: fuel-break
+    title: Fuel break
+    category: fire
+    phase: access
+    summary: >
+      A strip where brush and lower tree limbs are cleared to slow a fire and give firefighters a place to work,
+      often along a ridge, road or property edge. Grazing can keep it open.
+    goals: {fire: 3, livestock: 1}
+    topics: [design_for_catastrophe, broad_scale]
+    conditions: {area_m2: [20000, null]}
+    maintenance: medium
+    cost_tier: 2
+    nrcs: ["383"]
+    references: [osu-design-climate-resilience, oaec-pdc]
+    quantity: {basis: area_m2, default: 8094}
+    cost_item: fuel_reduction_acre
+
+  - id: brush-berms
+    title: Brush berms on contour
+    category: fire
+    phase: soil
+    summary: >
+      Brush from fuel-reduction work laid in low windrows along the contour instead of being burned. Slows runoff,
+      catches sediment and seeds, and breaks down into soil.
+    goals: {erosion: 2, fire: 1, habitat: 1, soil: 1}
+    topics: [earthworks, design_for_catastrophe, soils]
+    conditions: {slope_pct: [5, null]}
+    maintenance: low
+    cost_tier: 1
+    references: [oaec-pdc]
+    quantity: {basis: length_m, default: 150}
+    cost_item: brush_berm_ft
+    cautions:
+      - Keep brush berms well away from buildings, roads and fuel breaks so they don't add fuel where it matters.
+
+  # ---------------------------------------------------------------- Animals
+  - id: poultry
+    title: Laying hens
+    category: animals
+    phase: subdivision
+    summary: >
+      A small flock in a secure coop with a run or rotating paddocks. Eggs, pest control and manure for compost.
+    goals: {livestock: 3, food: 2, soil: 2}
+    topics: [animals, home_system]
+    maintenance: high
+    cost_tier: 1
+    references: [bloom-boehnlein-practical-permaculture]
+    quantity: {basis: count, default: 1}
+    cost_item: coop_each
+    cautions:
+      - Check city, county and HOA rules on flock size and roosters.
+
+  - id: rotational-grazing
+    title: Rotational grazing
+    category: animals
+    phase: subdivision
+    summary: >
+      Moving livestock through small paddocks with rest between grazings, using portable fencing and water.
+      Regrows pasture, builds soil and keeps fuels down.
+    goals: {livestock: 3, soil: 2, fire: 2, income: 2}
+    topics: [animals, broad_scale]
+    conditions: {area_m2: [20000, null]}
+    maintenance: high
+    cost_tier: 2
+    nrcs: ["528", "382", "614"]
+    references: [osu-intro-permaculture]
+    quantity: {basis: area_m2, default: 40469}
+    cost_item: grazing_acre
+
+  # ---------------------------------------------------------------- Structures and access
+  - id: access-on-contour
+    title: Roads and paths on contour
+    category: structures
+    phase: access
+    summary: >
+      Laying farm roads and main paths along the contour, or just off it, so they shed water gently instead of
+      channelling it, double as water harvesting, and give fire crews access.
+    goals: {erosion: 2, fire: 2, income: 1}
+    topics: [earthworks, broad_scale, built_environment]
+    requires: [terrain]
+    conditions: {area_m2: [10000, null], slope_pct: [null, 30]}
+    maintenance: low
+    cost_tier: 2
+    nrcs: ["560"]
+    references: [osu-intro-permaculture, millison-best-worst-places-to-build]
+    quantity: {basis: length_m, default: 150}
+    cost_item: access_road_ft
+    cautions:
+      - Grading above the county's threshold needs a grading permit.
+
+  - id: high-tunnel
+    title: Greenhouse or high tunnel
+    category: structures
+    phase: structures
+    summary: >
+      A hoop house that extends the growing season and protects crops from frost and heavy rain.
+    goals: {food: 3, income: 2}
+    topics: [built_environment, appropriate_technology]
+    conditions: {slope_pct: [null, 8]}
+    maintenance: medium
+    cost_tier: 2
+    nrcs: ["325"]
+    references: [bloom-boehnlein-practical-permaculture]
+    quantity: {basis: area_m2, default: 90}
+    cost_item: tunnel_sqft
+    cautions:
+      - Permit rules for greenhouses vary; agricultural buildings are often exempt but check with the county.

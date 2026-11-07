@@ -24,7 +24,7 @@ from .storage import get_storage
 from .common import JOB_COLUMNS, PROJECT_SELECT, SURVEY_COLUMNS, _project_or_404, load_dem as _load_dem
 
 app = FastAPI(title="Terraform Robotics API", version="0.1.0")
-from . import assistant, design_api, knowledge_api, outputs, parcels, tiles  # noqa: E402
+from . import assistant, design_api, knowledge_api, outputs, parcels, plan_api, tiles  # noqa: E402
 
 app.include_router(design_api.router)
 app.include_router(outputs.router)
@@ -32,6 +32,7 @@ app.include_router(tiles.router)
 app.include_router(parcels.router)
 app.include_router(knowledge_api.router)
 app.include_router(assistant.router)
+app.include_router(plan_api.router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(","),

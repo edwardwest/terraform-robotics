@@ -12,7 +12,7 @@ import time
 
 import httpx
 
-from . import efotg, nrcs, plants, rules
+from . import efotg, interventions, nrcs, plants, rules
 from .store import upsert_document, upsert_species
 
 log = logging.getLogger("tr_kb")
@@ -29,9 +29,9 @@ def _engine():
 def ingest_rules() -> int:
     n = 0
     with _engine().begin() as conn:
-        for d in rules.rule_documents() + rules.reference_documents():
+        for d in rules.rule_documents() + rules.reference_documents() + interventions.intervention_documents():
             n += upsert_document(conn, **d)
-    log.info("rules and references: %d chunks", n)
+    log.info("rules, references and interventions: %d chunks", n)
     return n
 
 

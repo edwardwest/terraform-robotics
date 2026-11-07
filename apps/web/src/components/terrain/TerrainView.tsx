@@ -1,4 +1,5 @@
 "use client";
+import { stepCount } from "@/lib/steps";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -207,7 +208,7 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
       <aside className={styles.left} aria-label="Layers">
         <div className={styles.intro}>
           <p className="app-eyebrow">
-            {project ? `${project.name} · ${formatAcres(project.area_m2)} acres · ` : ""}Step 3 of 5
+            {project ? `${project.name} · ${formatAcres(project.area_m2)} acres · ` : ""}{stepCount("terrain")}
           </p>
           <h1 className="app-display">Where the water goes.</h1>
           <p className="app-body">
@@ -415,16 +416,16 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
 
         <div className={styles.next}>
           {summary ? (
-            <Link href={`/projects/${projectId}/design`} className="btn btn-primary">
-              Design keylines <IconArrowRight />
+            <Link href={`/projects/${projectId}/ideas`} className="btn btn-primary">
+              See ideas <IconArrowRight />
             </Link>
           ) : (
             <button type="button" className="btn btn-primary" disabled>
-              Design keylines <IconArrowRight />
+              See ideas <IconArrowRight />
             </button>
           )}
           {summary && keypoints.length > 0 && confirmedCount === 0 && (
-            <p className="app-small">Confirm the keypoints you trust; the design step starts from them.</p>
+            <p className="app-small">Confirm the keypoints you trust; keyline and swale design starts from them.</p>
           )}
         </div>
       </aside>

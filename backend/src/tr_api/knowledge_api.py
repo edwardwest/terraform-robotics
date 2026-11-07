@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/api/knowledge/search")
 def knowledge_search(user: CurrentUser, q: str = Query(..., min_length=2, max_length=300),
-                     source: str | None = Query(None, pattern="^(nrcs_cps|rules|references)$"), limit: int = Query(6, ge=1, le=20)):
+                     source: str | None = Query(None, pattern="^(nrcs_cps|rules|references|interventions)$"), limit: int = Query(6, ge=1, le=20)):
     with get_engine().connect() as conn:
         hits = store.search(conn, q, limit=limit, source=source)
     return [{**h, "score": round(float(h["score"]), 4)} for h in hits]

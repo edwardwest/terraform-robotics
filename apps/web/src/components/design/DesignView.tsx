@@ -21,6 +21,8 @@ import type { LayerData } from "../terrain/TerrainMap";
 import { SectionProfile } from "../terrain/SectionProfile";
 import tv from "../terrain/TerrainView.module.css";
 import { useAssistantDesign, useAssistantPage } from "@/lib/assistant";
+import { stepCount } from "@/lib/steps";
+import { PlanPanel } from "./PlanPanel";
 import styles from "./DesignView.module.css";
 
 const TerrainMap = dynamic(() => import("../terrain/TerrainMap").then((m) => m.TerrainMap), {
@@ -34,7 +36,7 @@ type Mode = "keyline" | "swale";
 const fmtInt = (n: number) => Math.round(n).toLocaleString("en-US");
 const usd = (n: number) => `$${fmtInt(n)}`;
 
-export function DesignView({ projectId }: { projectId: string }) {
+export function DesignView({ projectId, initialTool = "keyline" }: { projectId: string; initialTool?: Mode }) {
   const [project, setProject] = useState<Project | null>(null);
   const [summary, setSummary] = useState<TerrainSummary | null>(null);
   const [data, setData] = useState<LayerData>({});
@@ -42,7 +44,8 @@ export function DesignView({ projectId }: { projectId: string }) {
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [mode, setMode] = useState<Mode>("keyline");
+  const [mode, setMode] = useState<Mode>(initialTool);
+  const [planCount, setPlanCount] = useState(0);
   const [keypoint, setKeypoint] = useState<string>("");
   const [gradeDen, setGradeDen] = useState(300);
   const [spacingFt, setSpacingFt] = useState("16");
@@ -118,6 +121,7 @@ export function DesignView({ projectId }: { projectId: string }) {
     summary && !tooCoarse ? { allowPlanning: needsDraft, onPreview: setPreviewProposal, onDesignChanged: refreshDesign } : null,
   );
   useAssistantPage("design", {
+    plan_items: planCount,
     terrain_model: summary ? "built" : "missing",
     terrain_grade: !summary ? null : designGrade ? "design" : tooCoarse ? "coarse" : "planning",
     mode: mode === "keyline" ? "Keyline pattern" : "Swale on contour",
@@ -223,14 +227,22 @@ export function DesignView({ projectId }: { projectId: string }) {
     <div className={tv.layout}>
       <aside className={tv.left} aria-label="Design tools">
         <div className={tv.intro}>
-          <p className="app-eyebrow">{project ? `${project.name} · ` : ""}Step 4 of 5</p>
-          <h1 className="app-display">Lay the lines that hold the water.</h1>
+          <p className="app-eyebrow">{project ? `${project.name} · ` : ""}{stepCount("design")}</p>
+          <h1 className="app-display">Put the plan on the land.</h1>
           <p className="app-body">
-            The engine draws each keyline through a keypoint, falling gently toward the ridges, then repeats it across the
-            slope. Swales follow a contour dead level.
+            Your plan in build order, water first. Keyline patterns and swales are computed from the terrain model: each
+            keyline runs through a keypoint, falling gently toward the ridges; swales follow a contour dead level.
           </p>
         </div>
 
+        <PlanPanel projectId={projectId} onCount={setPlanCount} onTool={(t) => {
+          setMode(t);
+          setPlacing(false);
+          setPending([]);
+          document.getElementById("design-tools")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }} />
+
+        <p className="app-eyebrow" id="design-tools">Water and earthworks tools</p>
         <div className={styles.tabs} role="tablist" aria-label="Element">
           {(["keyline", "swale"] as const).map((m) => (
             <button
@@ -479,7 +491,7 @@ export function DesignView({ projectId }: { projectId: string }) {
         {selectedFeature && <ElementDetail f={selectedFeature} />}
 
         <div className={tv.next}>
-          <Link href={`/projects/${projectId}/estimate`} className={`btn btn-primary ${features.length ? "" : styles.disabledLink}`} aria-disabled={!features.length}>
+          <Link href={`/projects/${projectId}/estimate`} className={`btn btn-primary ${features.length || planCount ? "" : styles.disabledLink}`} aria-disabled={!features.length && !planCount}>
             Review estimate <IconArrowRight />
           </Link>
           <p className="app-small">Lines are computed from the terrain model, never drawn by hand.</p>

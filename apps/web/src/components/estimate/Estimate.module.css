@@ -198,3 +198,8 @@
     font-size: 14px;
   }
 }
+
+.groupRow td {
+  padding-top: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
