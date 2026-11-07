@@ -75,13 +75,11 @@ export function DesignView({ projectId }: { projectId: string }) {
         const s = await api.getTerrain(projectId);
         setSummary(s);
         if (!s) return;
-        const names: LayerName[] = ["contours", "flow", "valleys", "ridges", "keypoints"];
-        const res = await Promise.allSettled(names.map((n) => api.getLayer(projectId, n)));
-        const next: LayerData = {};
-        res.forEach((r, i) => {
-          if (r.status === "fulfilled") next[names[i]] = r.value as FeatureCollection;
-        });
-        setData(next);
+        // Keypoints and the design first; contours are the heaviest layer, so they arrive on their own.
+        const names: LayerName[] = ["keypoints", "valleys", "ridges", "flow", "contours"];
+        names.forEach((n) =>
+          api.getLayer(projectId, n).then((fc) => setData((d) => ({ ...d, [n]: fc as FeatureCollection }))).catch(() => undefined),
+        );
         await refreshDesign();
       } catch (e) {
         setLoadError((e as Error).message);

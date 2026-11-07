@@ -225,7 +225,10 @@ def get_layer(project_id: UUID, layer: str, user: CurrentUser):
                'type', 'FeatureCollection',
                'features', COALESCE(json_agg(json_build_object(
                    'type', 'Feature',
-                   'geometry', ST_AsGeoJSON(geom, 7)::json,
+                   'geometry', CASE WHEN :layer = 'contours'
+                                    -- ~0.4 m tolerance and 6 decimals (~10 cm): same lines, a fraction of the bytes
+                                    THEN ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.000004), 6)::json
+                                    ELSE ST_AsGeoJSON(geom, 7)::json END,
                    'properties', properties)), '[]'::json)) AS fc
            FROM terrain_features WHERE project_id = :id AND layer = :layer""",
         id=str(project_id),
