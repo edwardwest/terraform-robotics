@@ -11,6 +11,12 @@ Terraform Robotics: site survey → terrain model → regenerative design. See R
 - Styling: only design tokens from `packages/design-tokens/tokens.json` (monochrome; no accent hue). No emoji in UI.
 - Hosting target is Google Cloud (Cloud Run, Cloud Run Jobs, Cloud SQL for PostgreSQL + PostGIS, Cloud Storage). Don't add AWS-specific dependencies.
 
+## Stage 2 notes
+- Designs on planning-grade terrain need `allow_planning` and are stored and exported as drafts; coarse terrain is refused.
+- Terrain caches (DEM, smoothed surface, slope tiles, GCS downloads) are keyed by the terrain job id; keep it that way, since `dem.tif` is rewritten in place on re-runs.
+- New SQL files must be idempotent; apply them in Cloud with `infra/gcp/migrate.sh` (never re-run `setup.sh` just to migrate: it rotates the DB password).
+- Prefer open-source libraries and free public data until the proof of concept is done.
+
 ## Commands
 - Backend tests: `cd backend && pytest`
 - API dev server: `cd backend && uvicorn tr_api.main:app --reload`
