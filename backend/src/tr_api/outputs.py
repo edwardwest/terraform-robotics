@@ -366,7 +366,7 @@ def export_dxf(project_id: UUID, user: CurrentUser):
         id=str(project_id), srid=srid_of(crs),
     )
     for c in contours:
-        g = wkb.loads(bytes(c["g"]))
+        g = wkb.loads(bytes(c["g"])).simplify(0.3)  # 30 cm keeps the shape and cuts the file several-fold
         layer = "CONTOUR_INDEX" if (c["properties"] or {}).get("index") else "CONTOUR"
         z = float((c["properties"] or {}).get("elevation_m", 0))
         msp.add_lwpolyline(list(g.coords), dxfattribs={"layer": layer, "elevation": z})

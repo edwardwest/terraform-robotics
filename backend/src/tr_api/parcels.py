@@ -52,8 +52,9 @@ class ArcGisParcels:
             parts = len(geom.geoms)
             geom = max(geom.geoms, key=lambda g: g.area)  # the site boundary is one polygon; keep the main part
         addr = p.get(self.address)
-        if addr and self.city and p.get(self.city):
-            addr = f"{addr}, {p[self.city]}"
+        city = p.get(self.city) if self.city else None
+        if addr and city and len(str(city)) > 3:  # skip assessor codes such as "UFR" (unincorporated)
+            addr = f"{addr}, {city}"
         return {
             "apn": p.get(self.apn),
             "address": addr.title() if isinstance(addr, str) else addr,
