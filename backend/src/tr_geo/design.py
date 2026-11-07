@@ -578,6 +578,46 @@ def valley_near(valleys: list[LineString], point: Point, max_dist: float = 30.0)
     return best if best.distance(point) <= max_dist else None
 
 
+def valley_trunk(valleys: list[tuple[LineString, dict]], point: Point, max_dist: float = 30.0, tol: float = 1.0) -> LineString | None:
+    """The main stem of the valley through `point`: its segment plus, at each confluence, the continuing trunk.
+
+    Valley segments run upstream → downstream and carry `accumulation_m2`. Downstream there is one way on;
+    upstream the trunk follows the branch draining the most area, so side valleys are left out.
+    """
+    if not valleys:
+        return None
+    lines = [g for g, _ in valleys]
+    acc = [float((p or {}).get("accumulation_m2", 0)) for _, p in valleys]
+    start = min(range(len(lines)), key=lambda i: lines[i].distance(point))
+    if lines[start].distance(point) > max_dist:
+        return None
+    chain = [start]
+    seen = {start}
+    head = Point(lines[start].coords[0])
+    while True:  # upstream: the biggest tributary ending at the head
+        ups = [j for j in range(len(lines)) if j not in seen and Point(lines[j].coords[-1]).distance(head) <= tol]
+        if not ups:
+            break
+        j = max(ups, key=lambda k: acc[k])
+        chain.insert(0, j)
+        seen.add(j)
+        head = Point(lines[j].coords[0])
+    tail = Point(lines[start].coords[-1])
+    while True:  # downstream: the segment starting where this one ends
+        downs = [j for j in range(len(lines)) if j not in seen and Point(lines[j].coords[0]).distance(tail) <= tol]
+        if not downs:
+            break
+        j = max(downs, key=lambda k: acc[k])
+        chain.append(j)
+        seen.add(j)
+        tail = Point(lines[j].coords[-1])
+    coords: list = []
+    for i in chain:
+        c = list(lines[i].coords)
+        coords.extend(c if not coords else c[1:])
+    return LineString(coords)
+
+
 def valley_system(valleys: list[LineString], point: Point, max_dist: float = 30.0, tol: float = 1.0) -> BaseGeometry | None:
     """Every valley segment connected (through confluences) to the one passing nearest `point`.
 

@@ -19,6 +19,7 @@ from tr_geo.design import (
     swale_on_contour,
     valley_near,
     valley_system,
+    valley_trunk,
 )
 
 
@@ -166,3 +167,14 @@ def test_valley_system_joins_segments_across_confluences():
     sys = valley_system([trunk_a, trunk_b, trib, other], P(1, 50))
     assert sys.length == pytest.approx(trunk_a.length + trunk_b.length + trib.length)
     assert valley_system([other], P(0, 0)) is None
+
+
+def test_valley_trunk_follows_main_stem():
+    from shapely.geometry import LineString as L, Point as P
+
+    head = (L([(0, 200), (0, 100)]), {"accumulation_m2": 9000})  # upstream trunk, flows south
+    side = (L([(80, 160), (0, 100)]), {"accumulation_m2": 2000})  # small tributary joining at (0, 100)
+    low = (L([(0, 100), (0, 0)]), {"accumulation_m2": 12000})  # downstream of the confluence
+    trunk = valley_trunk([head, side, low], P(1, 50))
+    assert trunk.length == pytest.approx(200)
+    assert trunk.coords[0] == (0, 200) and trunk.coords[-1] == (0, 0)

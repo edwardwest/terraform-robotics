@@ -67,7 +67,7 @@ def _site_context(project_id: UUID):
     t, surface, srid = terrain_surface(project_id)
     boundary = boundary_in(project_id, srid)
     ridges = unary_union([g for g, _ in layer_in(project_id, "ridges", srid)])
-    valleys = [g for g, _ in layer_in(project_id, "valleys", srid)]
+    valleys = layer_in(project_id, "valleys", srid)  # (geometry, properties) pairs
     return t, surface, srid, boundary, ridges, valleys
 
 
@@ -81,7 +81,8 @@ def get_design(project_id: UUID, user: CurrentUser):
 @router.post("/api/projects/{project_id}/design/keylines", response_model=schemas.KeylineResult)
 def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentUser):
     _project_or_404(project_id, user)
-    t, surface, srid, boundary, ridges, valleys = _site_context(project_id)
+    t, surface, srid, boundary, ridges, valley_rows = _site_context(project_id)
+    valleys = [g for g, _ in valley_rows]
     grade_label = _grade_gate(t["summary"], body.allow_planning)
     kp_rows = layer_in(project_id, "keypoints", srid, "AND properties->>'id' = :kp", kp=body.keypoint_id)
     if not kp_rows:
@@ -93,8 +94,9 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
         keyline, arms = geo.keyline_through(surface, (kp.x, kp.y), body.grade, stops=stops, within=boundary, step=step)
     except ValueError as e:
         raise HTTPException(422, str(e))
-    valley = geo.valley_near(valleys, kp)  # one merged line: seeds for graded lines
-    system = geo.valley_system(valleys, kp)  # the whole connected valley: which lines belong to it
+    # the keypoint's main valley stem: seeds graded lines and decides which pattern lines belong to it
+    valley = geo.valley_trunk(valley_rows, kp) or geo.valley_near(valleys, kp)
+    system = valley
     truncated = False
 
     if body.pattern == "parallel":
