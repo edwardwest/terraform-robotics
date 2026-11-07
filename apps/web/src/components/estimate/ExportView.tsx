@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, exportUrl, type DesignCollection, type Project } from "@/lib/api";
 import { IconAlert, IconArrowLeft, IconDownload } from "../Icons";
+import { useAssistantPage } from "@/lib/assistant";
 import styles from "./Estimate.module.css";
 
 type GisFormat = "geojson" | "shapefile" | "kml";
@@ -13,6 +14,13 @@ export function ExportView({ projectId }: { projectId: string }) {
   const [gis, setGis] = useState<GisFormat>("geojson");
   const [guidance, setGuidance] = useState<"geojson" | "shapefile">("shapefile");
   const [error, setError] = useState<string | null>(null);
+
+  useAssistantPage("estimate", {
+    page: "Export (reached from the Estimate step)",
+    design_elements: design ? design.features.length : null,
+    gis_format: gis,
+    tractor_path_format: guidance,
+  });
 
   useEffect(() => {
     api.getProject(projectId).then(setProject).catch((e: Error) => setError(e.message));

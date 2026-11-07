@@ -1,0 +1,278 @@
+/* Side panel below the header, on every project step. */
+.panel {
+  position: fixed;
+  top: var(--header-h);
+  right: 0;
+  bottom: 0;
+  z-index: 18;
+  width: var(--assistant-w);
+  max-width: 100vw;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--surface-base);
+  border-left: 1px solid var(--rule);
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.head :global(.app-eyebrow) {
+  margin: 0;
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch);
+  height: var(--touch);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+
+.close:hover {
+  border-color: var(--border-strong);
+  color: var(--fg-1);
+}
+
+.log {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Header button */
+.headerBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color var(--fade), color var(--fade);
+}
+
+.headerBtn:hover {
+  border-color: var(--border-strong);
+  color: var(--fg-1);
+}
+
+.headerBtnOn {
+  background: var(--surface-pill);
+  border-color: var(--border-strong);
+  color: var(--fg-1);
+}
+
+.dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-1);
+}
+
+/* A single nudge under the header button */
+.nudge {
+  position: fixed;
+  top: calc(var(--header-h) + var(--space-1));
+  right: var(--space-4);
+  z-index: 19;
+  width: min(340px, calc(100vw - 2 * var(--space-3)));
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-card-solid);
+}
+
+.nudgeText {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--fg-1);
+}
+
+.nudgeActions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+@media (max-width: 720px) {
+  .panel {
+    width: 100vw;
+    border-left: 0;
+  }
+
+  .nudge {
+    right: var(--space-3);
+  }
+}
+
+.starters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.starter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.starter:hover {
+  border-color: var(--border-strong);
+  color: var(--fg-1);
+}
+
+.user,
+.bot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.user {
+  align-self: flex-end;
+  max-width: 88%;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-card);
+  background: var(--surface-pill);
+  color: var(--fg-1);
+}
+
+.bot {
+  color: var(--fg-2);
+}
+
+.para {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.proposal {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.previewing {
+  border-color: var(--border-strong);
+  background: var(--surface-card);
+}
+
+.propHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.propTitle {
+  font-weight: 700;
+  color: var(--fg-1);
+}
+
+.facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px var(--space-2);
+}
+
+.facts dd {
+  margin: 0;
+  color: var(--fg-1);
+}
+
+.note {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+}
+
+.propActions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.cites {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.cites a {
+  color: var(--fg-2);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.input {
+  resize: vertical;
+  min-height: 56px;
+  font: inherit;
+}
+
+.form :global(.btn) {
+  align-self: flex-end;
+}

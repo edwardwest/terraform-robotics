@@ -117,3 +117,69 @@ def test_summary_counts_saved_rip_lines(client, tmp_path_factory):
     s = _site_summary(pid, _project_or_404(pid, owner))
     kl = next(e for e in s["design_elements"] if e["kind"] == "keyline")
     assert kl["rip_lines"] == res["rip_count"] > 0
+
+
+def test_steps_decide_tools_and_guide(client, tmp_path_factory, monkeypatch):
+    """Off the Design step the assistant coaches: no design tools, the step's guide page, Sonnet."""
+    from conftest import make_terrain_project
+    from tr_api import assistant
+
+    pid, _, _ = make_terrain_project(client, tmp_path_factory, "Assistant steps")
+    fake = FakeClaude([
+        ([use(1, "propose_keyline_pattern", keypoint_id="K1")], "tool_use"),  # not offered here; refused if asked
+        ([{"type": "text", "text": "Confirm K1 first."}], "end_turn"),
+    ])
+    monkeypatch.setattr(assistant, "client_factory", lambda: fake)
+    ctx = {"selected_keypoint": "K1", "keypoints_confirmed": 0}
+    r = client.post(f"/api/projects/{pid}/assistant", json={
+        "messages": [{"role": "user", "content": "Propose a keyline pattern from K1"}],
+        "step": "terrain", "page_context": ctx})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["model"] == assistant.DEFAULT_MODEL  # no design tools on this step, so no design model
+    assert out["proposals"] == []
+    assert out["tool_log"][0]["error"] == "propose_keyline_pattern is not available on the Terrain step"
+    sent = fake.calls[0]
+    assert {t["name"] for t in sent["tools"]} == assistant.STEP_TOOLS["terrain"]
+    assert "Where the water goes." in sent["system"][1]["text"]  # the Terrain guide page
+    assert '"selected_keypoint": "K1"' in sent["system"][1]["text"]
+    assert "cache_control" in sent["system"][0] and "cache_control" not in sent["system"][1]
+    assert client.get(f"/api/projects/{pid}/assistant/proposals").json() == []
+
+
+def test_coaching_works_before_terrain(client, monkeypatch):
+    """The Site and Survey steps have no terrain model; the assistant still answers from the project facts."""
+    from tr_api import assistant
+
+    boundary = {"type": "Polygon", "coordinates": [[[-122.9, 38.4], [-122.89, 38.4], [-122.89, 38.41], [-122.9, 38.41], [-122.9, 38.4]]]}
+    r = client.post("/api/projects", json={"name": "No terrain yet", "address": "", "boundary": boundary, "boundary_source": "drawn"})
+    assert r.status_code in (200, 201), r.text
+    pid = r.json()["id"]
+    fake = FakeClaude([
+        ([use(1, "get_site_summary")], "tool_use"),
+        ([{"type": "text", "text": "Fetch public elevation next."}], "end_turn"),
+    ])
+    monkeypatch.setattr(assistant, "client_factory", lambda: fake)
+    r = client.post(f"/api/projects/{pid}/assistant", json={
+        "messages": [{"role": "user", "content": "What should I do next?"}], "step": "survey"})
+    assert r.status_code == 200, r.text
+    summary = fake.calls[1]["messages"][-1]["content"][0]["content"]
+    assert '"terrain": null' in summary and '"surveys": []' in summary
+    assert {t["name"] for t in fake.calls[0]["tools"]} == {"get_site_summary", "search_knowledge"}
+
+
+def test_page_context_is_bounded(client):
+    r = client.post("/api/projects/00000000-0000-0000-0000-000000000000/assistant", json={
+        "messages": [{"role": "user", "content": "hi"}], "step": "site", "page_context": {"x": "y" * 5000}})
+    assert r.status_code == 422
+    r = client.post("/api/projects/00000000-0000-0000-0000-000000000000/assistant", json={
+        "messages": [{"role": "user", "content": "hi"}], "step": "export"})
+    assert r.status_code == 422
+
+
+def test_question_tags():
+    from tr_api.assistant import question_tag
+
+    assert question_tag("How do I confirm a keypoint?") == "how-to"
+    assert question_tag("Propose two keyline options") == "design-request"
+    assert question_tag("What does a score of 0.49 mean?") == "explain"

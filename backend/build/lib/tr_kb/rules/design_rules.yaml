@@ -1,0 +1,151 @@
+# Terraform Robotics design rules. In-house, versioned and cited. Each rule states what the geometry engine
+# does or checks, and why. Status "draft" means it awaits review by an experienced practitioner.
+version: "0.1"
+rules:
+  - id: keypoint
+    title: What a keypoint is
+    status: draft
+    applies_to: [keyline]
+    statement: >
+      A keypoint is the point on a primary valley floor where the long profile changes from steeper (convex)
+      above to flatter (concave) below. The keyline for that valley is laid through it. The app finds candidate
+      keypoints as the point of greatest concavity on each smoothed valley profile and asks the designer to
+      confirm them, because detection on coarse data is unreliable.
+    parameters: {profile_smoothing_m: 15, min_drop_m: 0.2}
+    sources:
+      - "Yeomans, P.A. (1954, 1958). The Keyline Plan; The Challenge of Landscape. Keyline concepts of the keypoint and keyline."
+      - "Terraform Robotics technical specification, W3 keypoint detection."
+
+  - id: keyline-grade
+    title: Keyline grade off contour
+    status: draft
+    applies_to: [keyline, rip]
+    statement: >
+      A keyline is not dead level: from the keypoint it falls gently toward the ridges on both sides, so water
+      that follows the cultivation lines is moved out of the wetter valley onto the drier ridges. The app lets
+      the designer choose a fall between 1:200 and 1:500 and defaults to 1:300 (about 0.33%). Steeper falls move
+      water faster but risk concentrating flow; flatter falls approach contour cultivation.
+    parameters: {grade_default: 0.00333, grade_choices: [0.005, 0.00333, 0.0025, 0.002]}
+    sources:
+      - "Yeomans, P.A. Water for Every Farm (Keyline principle of cultivating off contour, falling toward ridges)."
+      - "Range of falls is the app's default design choice; confirm with practitioner review."
+
+  - id: keyline-pattern
+    title: Parallel (Yeomans) versus graded patterns
+    status: draft
+    applies_to: [rip]
+    statement: >
+      In Yeomans' keyline pattern, cultivation runs parallel to the keyline; below the keyline in a valley this
+      drifts water toward the ridges. Parallel lines keep even spacing for the plow, but their fall drifts away from
+      the keyline's grade as the land changes, and on steep or complex ground parts of a parallel line can carry
+      water back toward the valley. Each line is checked: lines that carry water toward the valley, or fall steeper
+      than 1:100 over about 20 m, are flagged. On steep ground the graded pattern, where every line holds the
+      design grade and spacing varies instead, is usually the better choice.
+    parameters: {rip_steep_warning_grade: 0.01, steepness_window_m: 20}
+    sources:
+      - "Yeomans, P.A. Water for Every Farm (keyline pattern cultivation)."
+      - "Terraform Robotics design rule (in-house): scour warning threshold, pending review."
+
+  - id: keyline-stops
+    title: Where a keyline ends
+    status: draft
+    applies_to: [keyline]
+    statement: >
+      Each arm of a keyline is traced from the keypoint at the design fall until it reaches a ridge, the next
+      valley, or the property line. If the ground flattens or breaks away before a ridge, the arm stops there and
+      the app reports it.
+    parameters: {}
+    sources: ["Terraform Robotics design rule (in-house)."]
+
+  - id: rip-timing
+    title: When to rip
+    status: draft
+    applies_to: [rip]
+    statement: >
+      Subsoil ripping works best when the soil is moist but not wet: dry soil shatters poorly and wet soil
+      smears and compacts. Pastures are usually ripped shallow first and deeper in later years. Check NRCS
+      Deep Tillage (324) for criteria where ripping breaks a restrictive layer.
+    parameters: {}
+    sources:
+      - "Yeomans, P.A. Water for Every Farm (progressive deepening of keyline cultivation)."
+      - "NRCS Conservation Practice Standard 324, Deep Tillage."
+
+  - id: swale-level
+    title: Swales sit dead level on contour
+    status: draft
+    applies_to: [swale]
+    statement: >
+      A swale is a level channel dug on contour with the spoil placed as a berm on the downhill side. Because
+      it is level, water spreads along its length and soaks in rather than flowing. Every swale needs a level,
+      stable spillway where it will overflow, away from the berm's weakest point and never onto fill.
+    parameters: {}
+    sources:
+      - "Mollison, B. (1988). Permaculture: A Designers' Manual. Swales and spillways."
+      - "NRCS Conservation Practice Standard 362, Diversion (related structure: channel with supporting ridge)."
+
+  - id: swale-slope
+    title: Ground slope limits for swales
+    status: draft
+    applies_to: [swale]
+    statement: >
+      The app flags a swale where the ground along it is steeper than 15% (keep the berm well compacted) and
+      warns above 25%, where swales are hard to build and more likely to fail; consider terraces, a narrower
+      swale, or a shorter run there.
+    parameters: {caution_pct: 15, warning_pct: 25}
+    sources: ["Terraform Robotics design rule (in-house), pending practitioner review."]
+
+  - id: swale-sizing
+    title: Sizing a swale to its catchment
+    status: draft
+    applies_to: [swale]
+    statement: >
+      A swale's storage is its cross-section times its length (the app uses a parabolic section, two-thirds of
+      width times depth). Compare it with the runoff it receives: catchment area times the design storm depth
+      times a runoff coefficient for the ground cover. Where runoff exceeds storage, enlarge the swale, add swales
+      upslope, or make sure the spillway can carry the overflow.
+    parameters: {section_factor: 0.6667}
+    sources:
+      - "Standard runoff-volume estimate (rational-method volume), e.g. USDA NRCS National Engineering Handbook, Part 630 Hydrology."
+
+  - id: flow-crossing
+    title: Swales that cross a main flow path
+    status: draft
+    applies_to: [swale]
+    statement: >
+      Where a swale crosses a main flow path it will receive concentrated flow. Add a level spillway there or
+      move the swale; do not let concentrated flow overtop the berm.
+    parameters: {}
+    sources: ["Terraform Robotics design rule (in-house)."]
+
+  - id: setback
+    title: Property line setback
+    status: draft
+    applies_to: [swale, keyline, rip]
+    statement: >
+      The app flags earthworks within 3 m of the property line. Local grading rules, easements and neighbours'
+      drainage may require more; check with the county before construction.
+    parameters: {setback_m: 3}
+    sources: ["Terraform Robotics design rule (in-house). Local grading ordinances govern."]
+
+  - id: data-grade
+    title: Ground data needed for keyline design
+    status: draft
+    applies_to: [keyline, rip, swale]
+    statement: >
+      Keylines are laid on design-grade terrain: surveyed data (drone LiDAR or an RTK/total-station survey) at 1 m
+      or finer. Public elevation (USGS 3DEP) is planning grade even at 1 m, because its age and processing are not
+      controlled for the site; designs on it are drafts, and lines may sit a metre or more off in the field.
+      Coarser data is refused.
+    parameters: {design_max_res_m: 1.0, planning_max_res_m: 10.0}
+    sources: ["Terraform Robotics technical specification, W2 data-quality grades."]
+
+  - id: pond-siting
+    title: Ponds and dams
+    status: draft
+    applies_to: [pond]
+    statement: >
+      Pond and dam design follows NRCS Pond (378) in the US: site selection, drainage area relative to storage,
+      embankment and spillway criteria, and safety. Embankment dams above certain heights or storages fall under
+      state dam-safety regulation and need an engineer.
+    parameters: {}
+    sources: ["NRCS Conservation Practice Standard 378, Pond."]

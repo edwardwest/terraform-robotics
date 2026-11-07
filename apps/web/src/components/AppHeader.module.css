@@ -102,6 +102,7 @@ a.step:hover {
   margin-left: var(--space-3);
   display: flex;
   align-items: center;
+  gap: var(--space-2);
   min-width: 32px;
   min-height: 44px;
 }

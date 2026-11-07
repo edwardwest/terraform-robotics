@@ -19,6 +19,7 @@ import { IconAlert, IconArrowRight, IconCheck } from "../Icons";
 import type { LayerData } from "./TerrainMap";
 import type { ToggleKey } from "./layers";
 import { SectionProfile } from "./SectionProfile";
+import { useAssistantPage } from "@/lib/assistant";
 import styles from "./TerrainView.module.css";
 
 const TerrainMap = dynamic(() => import("./TerrainMap").then((m) => m.TerrainMap), {
@@ -177,6 +178,28 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
   const confirmedCount = keypoints.filter((k) => k.properties.confirmed).length;
   const progress = jobProgress(job);
   const hasHillshade = !!summary?.dem_tiles_url;
+
+  useAssistantPage("terrain", {
+    terrain_model: running ? "building" : summary ? "built" : summaryLoaded ? "missing" : "loading",
+    build_progress: running ? job?.step ?? null : undefined,
+    summary: summary
+      ? {
+          elevation_min_m: summary.elevation_min_m, elevation_max_m: summary.elevation_max_m,
+          mean_slope_pct: summary.mean_slope_pct, main_valleys: summary.main_valley_count,
+          water_leaves_toward: summary.outlet_direction, dem_resolution_m: summary.dem_resolution_m,
+          quality_pct: summary.quality,
+        }
+      : null,
+    layers_on: LAYER_TOGGLES.filter((l) => visible[l.key]).map((l) => l.label),
+    keypoint_count: keypoints.length,
+    keypoints_confirmed: confirmedCount,
+    keypoints: keypoints.map((k) => ({
+      id: k.properties.id, elevation_m: k.properties.elevation_m, score: k.properties.score, confirmed: k.properties.confirmed,
+    })),
+    selected_keypoint: selectedKp,
+    drawing_section: sectionMode,
+    section_profile: profile ? "shown below the map" : null,
+  });
 
   return (
     <div className={styles.layout}>

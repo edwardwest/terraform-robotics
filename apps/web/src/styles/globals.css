@@ -5,6 +5,7 @@
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --fade: 160ms var(--ease);
   --header-h: 72px;
+  --assistant-w: 400px;
   --touch: 44px;
   --content-max: 1440px;
   --gutter: var(--space-4);
@@ -317,5 +318,12 @@ button, input, select, textarea {
   *, *::before, *::after {
     animation-duration: 1ms !important;
     transition-duration: 1ms !important;
+  }
+}
+
+/* While the assistant panel is open on a wide screen, the page gives it room instead of sitting under it. */
+@media (min-width: 1400px) {
+  body[data-assistant="open"] #main {
+    padding-right: var(--assistant-w);
   }
 }

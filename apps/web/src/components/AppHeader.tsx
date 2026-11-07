@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { Show, UserButton } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
+import { AssistantButton } from "./assistant/AssistantDock";
 import styles from "./AppHeader.module.css";
 
 const STEPS = [
@@ -64,6 +65,7 @@ export function AppHeader() {
       )}
       <div className={styles.account}>
         <Show when="signed-in">
+          <AssistantButton />
           <UserButton />
         </Show>
       </div>

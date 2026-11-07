@@ -19,8 +19,8 @@ import { formatFeet, ftToM, m2ToAcres, mToFt } from "@/lib/units";
 import { IconAlert, IconArrowRight, IconX } from "../Icons";
 import type { LayerData } from "../terrain/TerrainMap";
 import { SectionProfile } from "../terrain/SectionProfile";
-import { AssistantPanel } from "./AssistantPanel";
 import tv from "../terrain/TerrainView.module.css";
+import { useAssistantDesign, useAssistantPage } from "@/lib/assistant";
 import styles from "./DesignView.module.css";
 
 const TerrainMap = dynamic(() => import("../terrain/TerrainMap").then((m) => m.TerrainMap), {
@@ -113,6 +113,25 @@ export function DesignView({ projectId }: { projectId: string }) {
   const swales = features.filter((f) => f.properties.kind === "swale");
   const rips = features.filter((f) => f.properties.kind === "rip");
   const selectedFeature = features.find((f) => f.properties.id === selected) ?? null;
+
+  useAssistantDesign(
+    summary && !tooCoarse ? { allowPlanning: needsDraft, onPreview: setPreviewProposal, onDesignChanged: refreshDesign } : null,
+  );
+  useAssistantPage("design", {
+    terrain_model: summary ? "built" : "missing",
+    terrain_grade: !summary ? null : designGrade ? "design" : tooCoarse ? "coarse" : "planning",
+    mode: mode === "keyline" ? "Keyline pattern" : "Swale on contour",
+    keyline_settings: mode === "keyline"
+      ? { keypoint, grade_off_contour: `1:${gradeDen}`, rip_spacing_ft: spacingFt, extent, pattern }
+      : undefined,
+    swale_settings: mode === "swale" ? { width_ft: widthFt, depth_ft: depthFt, berm, placing } : undefined,
+    planning_draft_ticked: needsDraft ? allowDraft : undefined,
+    keypoints: keypoints.map((k) => ({ id: k.properties.id, confirmed: k.properties.confirmed })),
+    saved_design: { keylines: keylines.length, rip_lines: rips.length, swales: swales.length },
+    selected_element: selectedFeature ? `${selectedFeature.properties.kind} ${selectedFeature.properties.label ?? ""}`.trim() : null,
+    previewing_proposal: previewProposal ? previewProposal.kind : null,
+    estimate_total_usd: estimate ? [Math.round(estimate.total_low), Math.round(estimate.total_high)] : null,
+  });
 
   const generate = async () => {
     setBusy(true);
@@ -396,14 +415,6 @@ export function DesignView({ projectId }: { projectId: string }) {
             <h2 className="app-h2">Build the terrain first.</h2>
             <Link href={`/projects/${projectId}/survey`} className="btn btn-sm">Go to survey</Link>
           </section>
-        )}
-        {summary && !tooCoarse && (
-          <AssistantPanel
-            projectId={projectId}
-            allowPlanning={needsDraft}
-            onPreview={setPreviewProposal}
-            onDesignChanged={refreshDesign}
-          />
         )}
         {summary && !designGrade && (
           <section className={`card ${tv.panel} ${styles.gradeCard}`}>

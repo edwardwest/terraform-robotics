@@ -166,6 +166,9 @@ export interface Estimate {
 
 export interface ChatMessage { role: "user" | "assistant"; content: string }
 
+/** The project step the assistant is answering from; it decides the assistant's tools and guide page. */
+export type AssistantStep = "site" | "survey" | "terrain" | "design" | "estimate";
+
 export interface Proposal {
   id: string;
   kind: "keyline" | "swale";
@@ -301,8 +304,12 @@ export const api = {
     request<CostItem>(`/cost-items/${encodeURIComponent(item)}`, { method: "PUT", body: json({ rate_low, rate_high }) }),
   resetCostItem: (item: string) => request<void>(`/cost-items/${encodeURIComponent(item)}`, { method: "DELETE" }),
 
-  askAssistant: (id: string, messages: ChatMessage[], allowPlanning: boolean) =>
-    request<AssistantReply>(`/projects/${id}/assistant`, { method: "POST", body: json({ messages, allow_planning: allowPlanning }) }),
+  askAssistant: (id: string, messages: ChatMessage[], allowPlanning: boolean, step: AssistantStep = "design",
+    pageContext: Record<string, unknown> = {}) =>
+    request<AssistantReply>(`/projects/${id}/assistant`, {
+      method: "POST",
+      body: json({ messages, allow_planning: allowPlanning, step, page_context: pageContext }),
+    }),
   listProposals: (id: string) => request<Proposal[]>(`/projects/${id}/assistant/proposals`),
   acceptProposal: (id: string, pid: string) =>
     request<Proposal>(`/projects/${id}/assistant/proposals/${pid}/accept`, { method: "POST" }),

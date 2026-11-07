@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
@@ -244,6 +245,15 @@ class AssistantMessage(BaseModel):
 class AssistantRequest(BaseModel):
     messages: list[AssistantMessage] = Field(min_length=1, max_length=40)
     allow_planning: bool = False
+    step: Literal["site", "survey", "terrain", "design", "estimate"] = "design"
+    page_context: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("page_context")
+    @classmethod
+    def small_context(cls, v):
+        if len(json.dumps(v, default=str)) > 4000:
+            raise ValueError("page_context is too large (4,000 characters at most)")
+        return v
 
     @field_validator("messages")
     @classmethod

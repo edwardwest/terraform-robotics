@@ -3,6 +3,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@/styles/globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { AppHeader } from "@/components/AppHeader";
+import { AssistantDock } from "@/components/assistant/AssistantDock";
+import { AssistantProvider } from "@/lib/assistant";
 import { clerkAppearance } from "@/lib/clerkAppearance";
 
 export const metadata: Metadata = {
@@ -22,8 +24,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <ClerkProvider appearance={clerkAppearance} afterSignOutUrl="/sign-in">
       <html lang="en">
         <body>
-          <AppHeader />
-          <main id="main">{children}</main>
+          <AssistantProvider>
+            <AppHeader />
+            <main id="main">{children}</main>
+            <AssistantDock />
+          </AssistantProvider>
         </body>
       </html>
     </ClerkProvider>

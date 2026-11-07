@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api, exportUrl, type CostItem, type Estimate, type Project } from "@/lib/api";
 import { IconAlert, IconArrowLeft, IconArrowRight, IconDownload } from "../Icons";
+import { useAssistantPage } from "@/lib/assistant";
 import styles from "./Estimate.module.css";
 
 const usd = (n: number, digits = 0) =>
@@ -80,6 +81,17 @@ export function EstimateView({ projectId }: { projectId: string }) {
 
   const q = estimate?.quantities;
   const empty = estimate && estimate.lines.length === 0;
+
+  useAssistantPage("estimate", {
+    page: "Estimate",
+    line_item_count: estimate ? estimate.lines.length : null,
+    lines: estimate?.lines.map((ln) => ({ label: ln.label, quantity: ln.quantity, unit: ln.unit,
+      total_usd: [Math.round(ln.total_low), Math.round(ln.total_high)], custom_rate: !!costs[ln.item]?.custom })),
+    total_usd: estimate ? [Math.round(estimate.total_low), Math.round(estimate.total_high)] : null,
+    contingency_pct: contingency,
+    editing_unit_costs: editing,
+    draft: estimate?.draft ?? null,
+  });
 
   return (
     <div className={styles.layout}>

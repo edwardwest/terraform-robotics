@@ -7,6 +7,7 @@ import { api, type BoundarySource, type GeocodeResult, type Parcel } from "@/lib
 import { extractPolygon, polygonAreaM2, polygonPerimeterM } from "@/lib/geo";
 import { formatAcres, formatMiles } from "@/lib/units";
 import { IconArrowRight, IconUpload } from "../Icons";
+import { useAssistantPage } from "@/lib/assistant";
 import styles from "./SiteSetup.module.css";
 
 const BoundaryMap = dynamic(() => import("../BoundaryMap").then((m) => m.BoundaryMap), {
@@ -65,6 +66,15 @@ export function SiteSetup({ projectId }: { projectId: string | null }) {
   }, [projectId]);
 
   const area = useMemo(() => polygonAreaM2(boundary), [boundary]);
+
+  useAssistantPage("site", {
+    property_name_set: !!name.trim(),
+    address_set: !!address.trim(),
+    boundary_source_selected: source === "parcel" ? "Import county parcel" : source === "drawn" ? "Draw it on the map" : "Upload a file",
+    boundary_set: !!boundary,
+    area_m2: boundary && area != null ? Math.round(area) : null,
+    errors: [error, fileError, parcelError, searchError].filter(Boolean),
+  });
   const perimeter = useMemo(() => polygonPerimeterM(boundary), [boundary]);
 
   const onFile = async (file: File | undefined) => {

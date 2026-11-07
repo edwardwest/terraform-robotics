@@ -6,6 +6,7 @@ import { formatAcres, formatResolution } from "@/lib/units";
 import { ContourArcs } from "../ContourArcs";
 import { IconArrowRight, IconDownload, IconDrone, IconFile, IconGlobe, IconPhone, IconUpload } from "../Icons";
 import { DataQuality } from "./DataQuality";
+import { useAssistantPage } from "@/lib/assistant";
 import styles from "./SurveySources.module.css";
 
 type UploadKind = Exclude<SurveyKind, "public_dem">;
@@ -154,6 +155,17 @@ export function SurveySources({ projectId }: { projectId: string }) {
   const publicDem = byKind("public_dem");
   const legacy = byKind("dem", "contours");
   const usable = surveys.filter((s) => s.status !== "failed");
+
+  useAssistantPage("survey", {
+    sources: surveys.map((s) => ({ kind: s.kind, status: s.status, resolution_m: s.resolution_m, grade: s.grade })),
+    usable_sources: usable.length,
+    terrain_model: terrain ? "built" : "not built yet",
+    design_pct: terrain?.quality.design_pct ?? null,
+    planning_pct: terrain?.quality.planning_pct ?? null,
+    coarse_pct: terrain?.quality.coarse_pct ?? null,
+    busy: building ? "starting the terrain build" : fetchingDem ? "fetching public elevation" : null,
+    errors: [demError, buildError, loadError].filter(Boolean),
+  });
 
   return (
     <div className={styles.page}>
