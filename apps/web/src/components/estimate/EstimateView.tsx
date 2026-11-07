@@ -9,6 +9,15 @@ const usd = (n: number, digits = 0) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 const range = (lo: number, hi: number) => (Math.round(lo) === Math.round(hi) ? usd(lo) : `${usd(lo)} – ${usd(hi)}`);
 const num = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d });
+const rate = (lo: number, hi: number) => {
+  const d = Math.min(lo, hi) < 10 && (lo % 1 || hi % 1) ? 2 : 0;
+  return lo === hi ? usd(lo, d) : `${usd(lo, d)} – ${usd(hi, d)}`;
+};
+const plural = (unit: string, q: number) => {
+  if (q === 1) return unit;
+  if (unit.endsWith("foot")) return unit.replace(/foot$/, "feet");
+  return `${unit}s`;
+};
 
 export function EstimateView({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null);
@@ -144,7 +153,7 @@ export function EstimateView({ projectId }: { projectId: string }) {
                       <span className={styles.itemLabel}>{ln.label}</span>
                       <span className="app-small">{ln.basis}</span>
                     </td>
-                    <td>{num(ln.quantity, ln.quantity < 10 ? 1 : 0)} {ln.unit}{ln.quantity === 1 ? "" : "s"}</td>
+                    <td>{num(ln.quantity, Number.isInteger(ln.quantity) || ln.quantity >= 10 ? 0 : 1)} {plural(ln.unit, ln.quantity)}</td>
                     <td>
                       {editing && draftRates[ln.item] ? (
                         <span className={styles.rateEdit}>
@@ -157,7 +166,7 @@ export function EstimateView({ projectId }: { projectId: string }) {
                         </span>
                       ) : (
                         <>
-                          {range(ln.rate_low, ln.rate_high)} / {ln.unit}
+                          {rate(ln.rate_low, ln.rate_high)} / {ln.unit}
                           {c?.custom && <span className="app-small"> · yours</span>}
                         </>
                       )}
