@@ -239,3 +239,10 @@ def test_parse_eol_dwca(tmp_path):
     assert t["states"] == "California"
     assert t["soil"] == "Coarse"
     assert t["nitrogen_fixation"] == "High"
+
+
+def test_trait_value_yes_no_and_flags():
+    T = "http://eol.org/schema/terms/"
+    assert plants.trait_value("fire_resistance", T + "fireResistantYes") == "Yes"
+    assert plants.trait_value("horticulture", T + "fruitSeedConspicuousYes") == "Fruit seed conspicuous"
+    assert plants.trait_value("horticulture", T + "coppicePotentialNo") is None

@@ -67,7 +67,7 @@ NAME_KEYS = {
 }
 STAT_SUFFIX = {"SIO_001113": "min", "SIO_001114": "max", "SIO_001110": "mature"}
 FROM_REMARKS = {"native_range", "introduced_range", "states"}  # the value is an id; the remark names the place
-FLAGS = {"propagation", "soil"}  # values like "propagatedByBareRootYes" -> list of the "Yes" flags
+FLAGS = {"propagation", "soil", "horticulture"}  # values like "propagatedByBareRootYes" -> list of the "Yes" flags
 KEEP_RANKS = {"species", "subspecies", "variety", "form", ""}
 
 
@@ -114,6 +114,8 @@ def trait_value(key: str, value: str, remarks: str = "") -> str | None:
         flag = re.sub(r"^(propagatedBy|propagated)", "", tail[:-3])
         return _words(re.sub(r"Soil$", "", flag)) or None
     label = VALUE_LABELS.get(tail)
+    if label is None and "://" in v and re.search(r"[a-z](Yes|No)$", tail):  # "fireResistantYes" -> "Yes"
+        label = "Yes" if tail.endswith("Yes") else "No"
     if label is None and "://" in v:
         label = _words(tail)
     label = label or v
