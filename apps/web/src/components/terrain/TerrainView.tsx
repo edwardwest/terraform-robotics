@@ -22,6 +22,7 @@ import type { ToggleKey } from "./layers";
 import { SectionProfile } from "./SectionProfile";
 import { useAssistantPage } from "@/lib/assistant";
 import styles from "./TerrainView.module.css";
+import { DayCycle } from "./DayCycle";
 
 const TerrainMap = dynamic(() => import("./TerrainMap").then((m) => m.TerrainMap), {
   ssr: false,
@@ -294,6 +295,7 @@ function TerrainViewInner({ projectId }: { projectId: string }) {
       <aside className={styles.right} aria-label="Terrain summary">
         {running && (
           <section className={`card ${styles.panel} fade-in`} aria-live="polite" aria-labelledby="job-title">
+            <DayCycle className={styles.dayCycle} />
             <p className="app-eyebrow">Building terrain model</p>
             <h2 id="job-title" className="app-h2">{job.step ? `${job.step}.` : "Queued."}</h2>
             {job.step_index != null && job.step_count != null && (

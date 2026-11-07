@@ -215,6 +215,10 @@
   gap: 6px;
 }
 
+.dayCycle {
+  margin-bottom: var(--space-1);
+}
+
 .errorPanel {
   border-color: var(--border-strong);
 }

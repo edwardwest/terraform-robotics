@@ -1,0 +1,95 @@
+/* One day lasts --day. Every part runs on the same clock so the scene stays in step:
+   sunrise 0-12%, cloud and rain 20-56%, sunset 50-62%, night 62-94%, then sunrise again. */
+.scene {
+  --day: 16s;
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 132px;
+}
+
+.land,
+.sun,
+.moon,
+.cloud,
+.star {
+  fill: var(--white);
+}
+
+/* The cloud's outline keeps it readable when it passes over the sun. */
+.cloud circle,
+.cloud rect {
+  stroke: var(--surface-card);
+  stroke-width: 1.5;
+  paint-order: stroke;
+}
+
+.sun { animation: sun var(--day) var(--ease) infinite; }
+.cloud { transform: translateX(-200px); animation: cloud var(--day) var(--ease) infinite; }
+.rain { opacity: 0; animation: rain var(--day) linear infinite; }
+.moon { transform: translateY(40px); animation: moon var(--day) var(--ease) infinite; }
+.stars { opacity: 0; animation: stars var(--day) linear infinite; }
+
+.drop {
+  stroke: var(--white);
+  stroke-width: 1;
+  stroke-linecap: round;
+  animation: fall 0.7s linear infinite;
+}
+
+.star { animation: twinkle 2s ease-in-out infinite; }
+
+@keyframes sun {
+  0% { transform: translateY(40px); }
+  12%, 50% { transform: translateY(0); }
+  62%, 100% { transform: translateY(42px); }
+}
+
+@keyframes cloud {
+  0%, 20% { transform: translateX(-200px); }
+  32%, 46% { transform: translateX(0); }
+  56%, 100% { transform: translateX(120px); }
+}
+
+@keyframes rain {
+  0%, 33% { opacity: 0; }
+  35%, 45% { opacity: 1; }
+  47%, 100% { opacity: 0; }
+}
+
+@keyframes moon {
+  0%, 60% { transform: translateY(40px); }
+  70%, 88% { transform: translateY(0); }
+  96%, 100% { transform: translateY(40px); }
+}
+
+@keyframes stars {
+  0%, 62% { opacity: 0; }
+  70%, 88% { opacity: 1; }
+  94%, 100% { opacity: 0; }
+}
+
+@keyframes fall {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(9px); opacity: 0; }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Reduced motion: a still midday scene. Overrides the global 1ms rule, which would flicker an infinite loop. */
+@media (prefers-reduced-motion: reduce) {
+  .sun,
+  .cloud,
+  .rain,
+  .moon,
+  .stars,
+  .drop,
+  .star {
+    animation: none !important;
+  }
+
+  .sun { transform: none; }
+}
