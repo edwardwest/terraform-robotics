@@ -72,7 +72,10 @@ class Archive:
             if el is not None:
                 cols.setdefault(int(el.get("index")), "_id")
         text = self.files[name].decode("utf-8", errors="replace")
-        rows = list(csv.reader(io.StringIO(text), delimiter=delim, quoting=csv.QUOTE_NONE))[skip:]
+        quote = spec.get("fieldsEnclosedBy") or ""
+        reader = (csv.reader(io.StringIO(text), delimiter=delim, quotechar=quote) if quote
+                  else csv.reader(io.StringIO(text), delimiter=delim, quoting=csv.QUOTE_NONE))
+        rows = list(reader)[skip:]
         return [{cols[i]: v for i, v in enumerate(r) if i in cols} for r in rows if r]
 
 
@@ -80,7 +83,7 @@ def parse_dwca(data: bytes) -> list[dict]:
     """Species rows: {symbol, scientific_name, common_name, family, traits{...}}."""
     arc = Archive(data)
     meta = ET.fromstring(arc.files["meta.xml"])
-    ns = "{http://rs.tdwg.org/dwc/text/}"
+    ns = "{http://rs.tdwg.org/dwc/text/}" if meta.tag.startswith("{") else ""
     tables = {}
     for spec in [meta.find(f"{ns}core"), *meta.findall(f"{ns}extension")]:
         if spec is None:
@@ -114,6 +117,8 @@ def parse_dwca(data: bytes) -> list[dict]:
         values[tid][trait_key(m["measurementType"])].add(val + (f" {unit.split('/')[-1]}" if unit and "://" in unit else ""))
     for tid, tv in values.items():
         by_taxon[tid]["traits"] = {k: sorted(v)[0] if len(v) == 1 else sorted(v) for k, v in tv.items()}
+    if not by_taxon:
+        raise ValueError("No taxa found in the archive; check its meta.xml")
     # one row per USDA symbol (the archive can repeat a taxon under several ids)
     out: dict[str, dict] = {}
     for row in by_taxon.values():
@@ -124,9 +129,10 @@ def parse_dwca(data: bytes) -> list[dict]:
 
 
 def _symbol(t: dict, tid: str) -> str:
-    for k in ("acceptedNameUsageID", "taxonID", "_id"):
+    """The USDA symbol when the id carries one (e.g. 'QUAG' or '.../QUAG'); otherwise the whole id, so taxa never merge."""
+    for k in ("taxonID", "_id"):
         v = (t.get(k) or "").strip()
-        m = re.search(r"([A-Z0-9]{3,8})$", v)
-        if m:
-            return m.group(1)
-    return re.sub(r"[^A-Za-z0-9]", "", tid)[:16].upper() or tid
+        last = re.split(r"[/:#]", v)[-1]
+        if re.fullmatch(r"[A-Z][A-Z0-9]{2,7}", last):
+            return last
+    return re.sub(r"[^A-Za-z0-9_.-]", "", tid)[:40] or tid

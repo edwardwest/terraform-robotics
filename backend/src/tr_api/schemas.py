@@ -238,12 +238,19 @@ class Parcel(BaseModel):
 
 class AssistantMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str = Field(max_length=8000)
+    content: str = Field(min_length=1, max_length=8000)
 
 
 class AssistantRequest(BaseModel):
     messages: list[AssistantMessage] = Field(min_length=1, max_length=40)
     allow_planning: bool = False
+
+    @field_validator("messages")
+    @classmethod
+    def ends_with_user(cls, v):
+        if v[-1].role != "user":
+            raise ValueError("The last message must be from the user")
+        return v
 
 
 class Proposal(BaseModel):

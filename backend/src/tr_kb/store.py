@@ -44,6 +44,8 @@ def upsert_document(conn, *, source: str, doc_key: str, title: str, body: str, l
 
 
 def upsert_species(conn, rows: list[dict], source: str, license: str) -> int:
+    if not rows:
+        return 0
     conn.execute(
         text("""INSERT INTO species (symbol, scientific_name, common_name, family, traits, source, license)
                 VALUES (:symbol, :scientific_name, :common_name, :family, CAST(:traits AS jsonb), :source, :license)
@@ -59,9 +61,9 @@ def upsert_species(conn, rows: list[dict], source: str, license: str) -> int:
 
 SEARCH_SQL = """
 WITH kw AS (
-    SELECT c.id, ts_rank_cd(c.tsv, q) AS score, row_number() OVER (ORDER BY ts_rank_cd(c.tsv, q) DESC) AS r
+    SELECT c.id, ts_rank_cd(c.tsv, q, 1) AS score, row_number() OVER (ORDER BY ts_rank_cd(c.tsv, q, 1) DESC) AS r
     FROM kb_chunks c JOIN kb_documents d ON d.id = c.document_id, to_tsquery('english', :qor) q
-    WHERE c.tsv @@ q AND (d.commercial_ok OR NOT CAST(:commercial_only AS boolean)) {source_filter}
+    WHERE CAST(:has_words AS boolean) AND c.tsv @@ q AND (d.commercial_ok OR NOT CAST(:commercial_only AS boolean)) {source_filter}
     ORDER BY score DESC LIMIT 40
 ), vec AS (
     SELECT c.id, row_number() OVER (ORDER BY c.embedding <=> CAST(:emb AS vector)) AS r
@@ -89,7 +91,8 @@ def search(conn, q: str, limit: int = 6, source: str | None = None, commercial_o
     import re
 
     words = [w for w in re.findall(r"[A-Za-z0-9]+", q.lower()) if len(w) > 1][:30]
-    params = {"qor": " | ".join(words) or "''", "emb": emb, "limit": limit, "commercial_only": commercial_only}
+    params = {"qor": " | ".join(words) if words else "x", "has_words": bool(words), "emb": emb, "limit": limit,
+              "commercial_only": commercial_only}
     if source:
         params["source"] = source
     return [dict(r) for r in conn.execute(text(sql), params).mappings().all()]

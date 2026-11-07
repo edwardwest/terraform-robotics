@@ -43,11 +43,26 @@ def chunk(text: str, max_chars: int = 1400, overlap: int = 150) -> list[tuple[st
         buf = ""
         for p in paras:
             pieces = [p] if len(p) <= max_chars else re.split(r"(?<=[.;:])\s+", p)
+            pieces = [w for piece in pieces for w in _hard_split(piece, max_chars - overlap - 1)]
             for piece in pieces:
                 if len(buf) + len(piece) + 1 > max_chars and buf:
                     out.append((head, buf.strip()))
-                    buf = buf[-overlap:] + " " if overlap else ""
+                    buf = (buf[-overlap:] + " ") if overlap else ""
                 buf += piece + "\n"
         if buf.strip():
             out.append((head, buf.strip()))
+    return out
+
+
+def _hard_split(text: str, limit: int) -> list[str]:
+    """Split text longer than `limit` at whitespace (tables from PDFs often have no sentence breaks)."""
+    limit = max(limit, 50)
+    out = []
+    while len(text) > limit:
+        cut = text.rfind(" ", 0, limit)
+        cut = cut if cut > limit // 2 else limit
+        out.append(text[:cut].strip())
+        text = text[cut:].strip()
+    if text:
+        out.append(text)
     return out

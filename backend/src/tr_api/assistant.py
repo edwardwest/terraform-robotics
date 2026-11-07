@@ -108,9 +108,10 @@ def _site_summary(project_id: UUID, project: dict) -> dict:
         """SELECT properties FROM terrain_features WHERE project_id = :id AND layer = 'keypoints'
            ORDER BY properties->>'id'""", id=str(project_id))
     elements = fetch_all(
-        """SELECT kind, label, params->>'keypoint_id' AS keypoint_id, count(*) OVER (PARTITION BY group_id) AS group_size,
-                  round(ST_Length(geom::geography)::numeric, 1) AS length_m, properties->>'storage_gal' AS storage_gal
-           FROM design_elements WHERE project_id = :id AND kind IN ('keyline', 'swale') ORDER BY kind, label""",
+        """SELECT e.kind, e.label, e.params->>'keypoint_id' AS keypoint_id,
+                  (SELECT count(*) FROM design_elements r WHERE r.group_id = e.group_id AND r.kind = 'rip') AS rips,
+                  round(ST_Length(e.geom::geography)::numeric, 1) AS length_m, e.properties->>'storage_gal' AS storage_gal
+           FROM design_elements e WHERE e.project_id = :id AND e.kind IN ('keyline', 'swale') ORDER BY e.kind, e.label""",
         id=str(project_id))
     q = s.get("quality", {})
     grade = "design" if q.get("design_pct", 0) >= 50 else "coarse" if q.get("coarse_pct", 0) >= 50 else "planning"
@@ -124,7 +125,7 @@ def _site_summary(project_id: UUID, project: dict) -> dict:
         "keypoints": [{k: p.get(k) for k in ("id", "elevation_m", "confirmed", "gradient_above_pct", "gradient_below_pct", "score")}
                       for p in (r["properties"] for r in kps)],
         "design_elements": [{"kind": e["kind"], "label": e["label"], "keypoint_id": e["keypoint_id"],
-                             "length_m": float(e["length_m"]), "rip_lines": int(e["group_size"]) - 1 if e["kind"] == "keyline" else None,
+                             "length_m": float(e["length_m"]), "rip_lines": int(e["rips"]) if e["kind"] == "keyline" else None,
                              "storage_gal": e["storage_gal"]} for e in elements],
     }
 
@@ -192,6 +193,26 @@ def _tool_propose_swale(project_id: UUID, args: dict, allow_planning: bool) -> d
     return {"proposal_id": pid, "keypoint_id": kp_id, "rise_m": rise, **summary}
 
 
+KEY_TRAITS = ("growth_habit", "duration", "native_status", "nitrogen_fixation", "drought_tolerance", "shade_tolerance",
+              "min_temp_f", "mature_height_ft", "moisture_use", "growth_rate", "precip_min_in", "precip_max_in")
+
+
+def _key_traits(traits: dict) -> dict:
+    picked = {k: traits[k] for k in KEY_TRAITS if k in traits}
+    for k in traits:
+        if len(picked) >= 16:
+            break
+        picked.setdefault(k, traits[k])
+    return picked
+
+
+def _float_or_none(v):
+    try:
+        return float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def run_tool(name: str, args: dict, project_id: UUID, project: dict, user: dict, allow_planning: bool) -> dict:
     try:
         if name == "get_site_summary":
@@ -216,13 +237,15 @@ def run_tool(name: str, args: dict, project_id: UUID, project: dict, user: dict,
                 rows = kb.find_species(conn, args.get("query"), growth_habit=args.get("growth_habit"),
                                        nitrogen_fixing=bool(args.get("nitrogen_fixing")),
                                        drought_tolerance=args.get("drought_tolerance"),
-                                       min_temp_f_at_most=args.get("min_temp_f_at_most"), limit=12)
+                                       min_temp_f_at_most=_float_or_none(args.get("min_temp_f_at_most")), limit=12)
             return {"species": [{"symbol": r["symbol"], "scientific_name": r["scientific_name"], "common_name": r["common_name"],
-                                 "family": r["family"], "traits": {k: r["traits"][k] for k in list(r["traits"])[:12]}} for r in rows],
+                                 "family": r["family"], "traits": _key_traits(r["traits"])} for r in rows],
                     "source": "USDA PLANTS (public domain)"}
         return {"error": f"Unknown tool {name}"}
     except HTTPException as e:
         return {"error": e.detail}
+    except Exception as e:  # a bad argument or an engine failure is reported to the model, not raised
+        return {"error": f"{type(e).__name__}: {str(e)[:300]}"}
 
 
 # ---- Conversation loop -----------------------------------------------------------------------------
@@ -239,8 +262,17 @@ def converse(project_id: UUID, user: dict, messages: list[dict], allow_planning:
     tool_log, proposal_ids, citations = [], [], []
     reply = ""
     for _ in range(MAX_TURNS):
-        resp = client.messages.create(model=model, max_tokens=2048, system=system, tools=TOOLS, messages=convo)
-        blocks = [b.model_dump() if hasattr(b, "model_dump") else dict(b) for b in resp.content]
+        try:
+            resp = client.messages.create(model=model, max_tokens=2048, system=system, tools=TOOLS, messages=convo)
+        except Exception as e:
+            import anthropic
+
+            if isinstance(e, anthropic.APIStatusError) and e.status_code in (429, 529):
+                raise HTTPException(503, "The assistant is busy right now. Try again in a minute.")
+            if isinstance(e, anthropic.APIError):
+                raise HTTPException(502, f"The assistant could not answer: {str(e)[:200]}")
+            raise
+        blocks = [b.model_dump(exclude_none=True) if hasattr(b, "model_dump") else dict(b) for b in resp.content]
         convo.append({"role": "assistant", "content": blocks})
         uses = [b for b in blocks if b.get("type") == "tool_use"]
         reply = "\n".join(b["text"] for b in blocks if b.get("type") == "text").strip()
@@ -255,12 +287,24 @@ def converse(project_id: UUID, user: dict, messages: list[dict], allow_planning:
                 if r["title"] not in [c["title"] for c in citations]:
                     citations.append({"title": r["title"], "url": r["url"], "code": r["code"]})
             tool_log.append({"tool": u["name"], "input": u.get("input") or {}, "error": out.get("error")})
-            results.append({"type": "tool_result", "tool_use_id": u["id"], "content": json.dumps(out, default=str)[:20000]})
+            result = {"type": "tool_result", "tool_use_id": u["id"], "content": json.dumps(out, default=str)[:20000]}
+            if out.get("error"):
+                result["is_error"] = True
+            results.append(result)
         convo.append({"role": "user", "content": results})
     else:
         reply = reply or "I ran out of steps before finishing. Ask me to continue."
-    proposals = [p for p in list_proposals_rows(project_id) if p["id"] in proposal_ids]
+    proposals = proposals_by_id(project_id, proposal_ids)
     return {"reply": reply, "model": model, "tool_log": tool_log, "proposals": proposals, "citations": citations}
+
+
+def proposals_by_id(project_id: UUID, ids: list[str]) -> list[dict]:
+    if not ids:
+        return []
+    return fetch_all(
+        """SELECT id::text AS id, kind, params, preview, summary, status, created_at FROM assistant_proposals
+           WHERE project_id = :pid AND id = ANY(CAST(:ids AS uuid[])) ORDER BY created_at""",
+        pid=str(project_id), ids=ids)
 
 
 def list_proposals_rows(project_id: UUID, status: str | None = None) -> list[dict]:
@@ -290,24 +334,32 @@ def accept_proposal(project_id: UUID, proposal_id: UUID, user: CurrentUser):
     from .design_api import plan_keyline, plan_swale, save_keyline, save_swale
 
     _project_or_404(project_id, user)
-    p = fetch_one("SELECT kind, params, status FROM assistant_proposals WHERE id = :id AND project_id = :pid",
-                  id=str(proposal_id), pid=str(project_id))
+    # claim the draft first, so two clicks (or two tabs) can never save it twice
+    p = fetch_one(
+        """UPDATE assistant_proposals SET status = 'accepted' WHERE id = :id AND project_id = :pid AND status = 'draft'
+           RETURNING kind, params""", id=str(proposal_id), pid=str(project_id))
     if not p:
-        raise HTTPException(404, "Proposal not found")
-    if p["status"] != "draft":
-        raise HTTPException(409, f"Proposal is already {p['status']}")
-    # recompute from the stored parameters so what is saved always matches the current terrain model
-    if p["kind"] == "keyline":
-        body = schemas.KeylineCreate(**p["params"])
-        save_keyline(project_id, body.keypoint_id, plan_keyline(project_id, body))
-    else:
-        save_swale(project_id, plan_swale(project_id, schemas.SwaleCreate(**p["params"])))
-    execute("UPDATE assistant_proposals SET status = 'accepted' WHERE id = :id", id=str(proposal_id))
-    return [r for r in list_proposals_rows(project_id) if r["id"] == str(proposal_id)][0]
+        cur = fetch_one("SELECT status FROM assistant_proposals WHERE id = :id AND project_id = :pid",
+                        id=str(proposal_id), pid=str(project_id))
+        raise HTTPException(409 if cur else 404, f"Proposal is already {cur['status']}" if cur else "Proposal not found")
+    try:
+        # recompute from the stored parameters so what is saved always matches the current terrain model
+        if p["kind"] == "keyline":
+            body = schemas.KeylineCreate(**p["params"])
+            save_keyline(project_id, body.keypoint_id, plan_keyline(project_id, body))
+        else:
+            save_swale(project_id, plan_swale(project_id, schemas.SwaleCreate(**p["params"])))
+    except Exception:
+        execute("UPDATE assistant_proposals SET status = 'draft' WHERE id = :id", id=str(proposal_id))
+        raise
+    return proposals_by_id(project_id, [str(proposal_id)])[0]
 
 
 @router.post("/api/projects/{project_id}/assistant/proposals/{proposal_id}/discard", status_code=204)
 def discard_proposal(project_id: UUID, proposal_id: UUID, user: CurrentUser):
     _project_or_404(project_id, user)
-    execute("UPDATE assistant_proposals SET status = 'discarded' WHERE id = :id AND project_id = :pid AND status = 'draft'",
-            id=str(proposal_id), pid=str(project_id))
+    row = fetch_one(
+        """UPDATE assistant_proposals SET status = 'discarded' WHERE id = :id AND project_id = :pid AND status = 'draft'
+           RETURNING id""", id=str(proposal_id), pid=str(project_id))
+    if not row:
+        raise HTTPException(404, "No draft proposal with that id")

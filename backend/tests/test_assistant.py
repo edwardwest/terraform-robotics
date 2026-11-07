@@ -9,8 +9,8 @@ pytestmark = pytest.mark.skipif(not os.environ.get("TEST_DATABASE_URL"), reason=
 
 
 class Block(SimpleNamespace):
-    def model_dump(self):
-        return dict(self.__dict__)
+    def model_dump(self, exclude_none=False):
+        return {k: v for k, v in self.__dict__.items() if not (exclude_none and v is None)}
 
 
 class FakeClaude:
@@ -82,3 +82,38 @@ def test_question_uses_default_model(client, tmp_path_factory, monkeypatch):
     monkeypatch.setattr(assistant, "client_factory", lambda: fake)
     out = client.post(f"/api/projects/{pid}/assistant", json={"messages": [{"role": "user", "content": "Which way does water leave?"}]}).json()
     assert out["model"] == assistant.DEFAULT_MODEL and out["proposals"] == []
+
+
+def test_bad_tool_arguments_become_tool_errors(client, tmp_path_factory, monkeypatch):
+    from conftest import make_terrain_project
+    from tr_api import assistant
+
+    pid, _, _ = make_terrain_project(client, tmp_path_factory, "Assistant errors")
+    fake = FakeClaude([
+        ([use(1, "propose_keyline_pattern", keypoint_id="K" * 40), use(2, "find_species", min_temp_f_at_most="cold"),
+          use(3, "search_knowledge", query="??")], "tool_use"),
+        ([{"type": "text", "text": "Sorry, those did not work."}], "end_turn"),
+    ])
+    monkeypatch.setattr(assistant, "client_factory", lambda: fake)
+    r = client.post(f"/api/projects/{pid}/assistant", json={"messages": [{"role": "user", "content": "Try things"}]})
+    assert r.status_code == 200, r.text
+    results = fake.calls[1]["messages"][-1]["content"]
+    assert results[0].get("is_error") is True
+    assert r.json()["reply"] == "Sorry, those did not work."
+    # the conversation must end on a user turn
+    bad = client.post(f"/api/projects/{pid}/assistant", json={"messages": [{"role": "assistant", "content": "hi"}]})
+    assert bad.status_code == 422
+
+
+def test_summary_counts_saved_rip_lines(client, tmp_path_factory):
+    from conftest import make_terrain_project
+    from tr_api.assistant import _site_summary
+    from tr_api.common import _project_or_404
+    from tr_api.db import fetch_one
+
+    pid, _, _ = make_terrain_project(client, tmp_path_factory, "Assistant summary")
+    res = client.post(f"/api/projects/{pid}/design/keylines", json={"keypoint_id": "K1", "spacing_m": 15, "pattern": "graded", "max_lines": 6}).json()
+    owner = fetch_one("SELECT owner_id AS id FROM projects WHERE id = :id", id=pid)
+    s = _site_summary(pid, _project_or_404(pid, owner))
+    kl = next(e for e in s["design_elements"] if e["kind"] == "keyline")
+    assert kl["rip_lines"] == res["rip_count"] > 0

@@ -36,13 +36,19 @@ def ingest_rules() -> int:
 
 def ingest_nrcs(limit: int | None = None, pause_s: float = 0.5) -> dict:
     stats = {"practices": 0, "documents": 0, "chunks": 0, "failed": []}
-    with httpx.Client(timeout=60, headers={"User-Agent": nrcs.USER_AGENT}) as client:
-        practices = nrcs.parse_index(client.get(nrcs.INDEX_URL).text)
+    with httpx.Client(timeout=60, follow_redirects=True, headers={"User-Agent": nrcs.USER_AGENT}) as client:
+        index = client.get(nrcs.INDEX_URL)
+        index.raise_for_status()
+        practices = nrcs.parse_index(index.text, str(index.url))
+        if not practices:
+            raise RuntimeError("No practices found on the NRCS index page; its layout may have changed")
         log.info("nrcs: %d practices in the index", len(practices))
         for p in practices[: limit or None]:
             stats["practices"] += 1
             try:
-                pdfs = nrcs.parse_practice_pdfs(client.get(p.url).text, p.url)
+                page = client.get(p.url)
+                page.raise_for_status()
+                pdfs = nrcs.parse_practice_pdfs(page.text, str(page.url))
                 for kind in ("standard", "overview"):
                     if kind not in pdfs:
                         continue
@@ -67,7 +73,9 @@ def ingest_nrcs(limit: int | None = None, pause_s: float = 0.5) -> dict:
 
 def ingest_plants(url: str = PLANTS_URL) -> int:
     with httpx.Client(timeout=300, follow_redirects=True, headers={"User-Agent": nrcs.USER_AGENT}) as client:
-        data = client.get(url).content
+        resp = client.get(url)
+        resp.raise_for_status()
+        data = resp.content
     rows = plants.parse_dwca(data)
     with _engine().begin() as conn:
         n = upsert_species(conn, rows, plants.SOURCE, plants.LICENSE)

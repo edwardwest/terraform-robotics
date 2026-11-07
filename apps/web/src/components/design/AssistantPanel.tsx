@@ -178,7 +178,7 @@ export function AssistantPanel({ projectId, allowPlanning, onPreview, onDesignCh
             {t.reply && t.reply.citations.length > 0 && (
               <ul className={styles.cites} aria-label="Sources">
                 {t.reply.citations.map((c) => (
-                  <li key={c.title}>{c.url ? <a href={c.url} target="_blank" rel="noreferrer">{c.title}</a> : c.title}</li>
+                  <li key={c.title}>{c.url && /^https:\/\//.test(c.url) ? <a href={c.url} target="_blank" rel="noreferrer">{c.title}</a> : c.title}</li>
                 ))}
               </ul>
             )}

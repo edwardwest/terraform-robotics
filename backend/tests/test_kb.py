@@ -127,3 +127,16 @@ def test_store_and_search(client):
     assert r.status_code == 200 and "378" in [h["code"] for h in r.json()[:3]]
     assert any(x["id"] == "swale-level" for x in client.get("/api/knowledge/rules").json())
     assert client.get("/api/species", params={"q": "oak"}).json()[0]["symbol"] == "QUAG"
+
+
+def test_chunks_never_exceed_limit_even_for_tables():
+    table = "DEFINITION\n" + " ".join(f"cell{i} 12.5 ft" for i in range(2000))
+    for _, body in chunking.chunk(table, max_chars=1400, overlap=150):
+        assert len(body) <= 1400
+
+
+@pytest.mark.skipif(not os.environ.get("TEST_DATABASE_URL"), reason="TEST_DATABASE_URL not set")
+def test_search_without_words_is_empty_not_an_error(client):
+    for q in ("??", "a é"):
+        r = client.get("/api/knowledge/search", params={"q": q})
+        assert r.status_code == 200
