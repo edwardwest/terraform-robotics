@@ -6,7 +6,7 @@ import tarfile
 
 import pytest
 
-from tr_kb import chunking, nrcs, plants, rules
+from tr_kb import chunking, efotg, nrcs, plants, rules
 
 INDEX_HTML = """
 <ul>
@@ -140,3 +140,45 @@ def test_search_without_words_is_empty_not_an_error(client):
     for q in ("??", "a é"):
         r = client.get("/api/knowledge/search", params={"q": q})
         assert r.status_code == 200
+
+
+EFOTG_MENU = {"result": [
+    {"title": "Section 1 - General Resource References", "itemId": 1, "children": []},
+    {"title": "Section 4 - Practice Standards and Supporting Documents", "itemId": 0, "children": [
+        {"title": "Index", "itemId": -556, "children": []},
+        {"title": "Conservation Practice Standards & Support Documents", "itemId": -3, "children": [
+            {"title": "Access Road (560)", "itemId": -14, "children": []},
+            {"title": "Pond  (378)", "itemId": -120, "children": []},
+            {"title": "Not a practice", "itemId": -9, "children": []},
+        ]},
+    ]},
+]}
+
+
+def test_efotg_practice_folders():
+    folders = efotg.practice_folders(EFOTG_MENU)
+    assert [(f.code, f.name, f.folder_id) for f in folders] == [("560", "Access Road", -14), ("378", "Pond", -120)]
+    assert efotg.practice_folders({"result": []}) == []
+
+
+def test_efotg_practice_docs_keeps_newest_standard_and_overview():
+    item = lambda rid, title, date: {"resourceId": rid, "resourceTitle": title, "documentUrl": f"{rid}/___",
+                                     "isDocument": True, "resourceRevisionDate": date}
+    listing = {"result": {"resourceItems": [
+        item(1, "378 CA CPS Pond 2017", "2017-10-01T00:00:00"),
+        item(2, "378 CA CPS Pond 2023", "2023-10-01T00:00:00"),
+        item(3, "378 CA PO Pond 2022", "2022-01-01T00:00:00"),
+        item(4, "378 CA SOW Pond 2023", "2023-10-01T00:00:00"),
+        item(5, "560 CA CPS Access Road 2023", "2023-10-01T00:00:00"),
+    ]}}
+    docs = efotg.practice_docs(listing, "378")
+    assert set(docs) == {"standard", "overview"}
+    assert docs["standard"].resource_id == 2
+    assert docs["standard"].url == "https://efotg.sc.egov.usda.gov/api/CPSFile/2/___"
+    assert docs["overview"].resource_id == 3
+
+
+def test_efotg_fips():
+    assert efotg.fips("ca") == "06" and efotg.fips("6") == "06"
+    with pytest.raises(ValueError):
+        efotg.fips("ZZ")
