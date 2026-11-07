@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from functools import lru_cache
+import threading
 from uuid import UUID
 
 import numpy as np
@@ -15,8 +15,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
 from .auth import CurrentUser
-from .common import _project_or_404, terrain_or_404
-from .storage import get_storage
+from .common import _project_or_404, dem_local_path, terrain_or_404
 
 router = APIRouter()
 
@@ -45,15 +44,25 @@ def _fill_nodata(z: np.ndarray, valid: np.ndarray) -> np.ndarray:
     return z[tuple(idx)]
 
 
-@lru_cache(maxsize=8)
-def slope_path(dem_path: str) -> str:
-    """A slope-percent GeoTIFF next to the cached DEM, built once per DEM."""
-    import rasterio
+_SLOPE_LOCK = threading.Lock()
 
-    out = os.path.join(tempfile.gettempdir(), "tr-slope", dem_path.replace("/", "_"))
+
+def slope_path(dem_path: str) -> str:
+    """A slope-percent GeoTIFF beside the cached DEM, built once per DEM file (paths are versioned per run)."""
+    out = os.path.join(tempfile.gettempdir(), "tr-slope", dem_path.strip("/").replace("/", "_"))
     if os.path.exists(out):
         return out
+    with _SLOPE_LOCK:  # tiles arrive in parallel; build once, publish atomically
+        if not os.path.exists(out):
+            _build_slope(dem_path, out)
+    return out
+
+
+def _build_slope(dem_path: str, out: str) -> None:
+    import rasterio
+
     os.makedirs(os.path.dirname(out), exist_ok=True)
+    tmp = f"{out}.{os.getpid()}.part"
     with rasterio.open(dem_path) as src:
         z = src.read(1).astype("float64")
         if src.nodata is not None:
@@ -63,9 +72,10 @@ def slope_path(dem_path: str) -> str:
         slope = np.hypot(dzx, dzy) * 100
         profile = src.profile.copy()
     profile.update(dtype="float32", nodata=-1.0)
-    with rasterio.open(out, "w", **profile) as dst:
+    profile.update(driver="GTiff")
+    with rasterio.open(tmp, "w", **profile) as dst:
         dst.write(np.where(np.isnan(slope), -1.0, slope).astype("float32"), 1)
-    return out
+    os.replace(tmp, out)
 
 
 def _render(data: np.ndarray) -> bytes:
@@ -95,7 +105,7 @@ def tile(project_id: UUID, kind: str, z: int, x: int, y: int, user: CurrentUser)
         raise HTTPException(404, "Unknown tile layer")
     _project_or_404(project_id, user)
     t = terrain_or_404(project_id)
-    dem_path = get_storage().local_path(t["dem_path"])
+    dem_path = dem_local_path(t)
     from rio_tiler.errors import TileOutsideBounds
     from rio_tiler.io import Reader
 

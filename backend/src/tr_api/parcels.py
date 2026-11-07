@@ -47,8 +47,10 @@ class ArcGisParcels:
     def to_parcel(self, feat: dict) -> dict:
         p = feat.get("properties") or {}
         geom = shape(feat["geometry"])
+        parts = 1
         if geom.geom_type == "MultiPolygon":
-            geom = max(geom.geoms, key=lambda g: g.area)
+            parts = len(geom.geoms)
+            geom = max(geom.geoms, key=lambda g: g.area)  # the site boundary is one polygon; keep the main part
         addr = p.get(self.address)
         if addr and self.city and p.get(self.city):
             addr = f"{addr}, {p[self.city]}"
@@ -56,8 +58,8 @@ class ArcGisParcels:
             "apn": p.get(self.apn),
             "address": addr.title() if isinstance(addr, str) else addr,
             "acres": p.get(self.acres) if self.acres else None,
-            "boundary": {"type": "Polygon", "coordinates": [[list(c) for c in geom.exterior.coords]]},
-            "source": self.name,
+            "boundary": {"type": "Polygon", "coordinates": [[list(c) for c in ring.coords] for ring in (geom.exterior, *geom.interiors)]},
+            "source": self.name if parts == 1 else f"{self.name} (largest of {parts} parts)",
         }
 
 

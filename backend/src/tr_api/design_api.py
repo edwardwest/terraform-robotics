@@ -16,7 +16,7 @@ from tr_geo import design as geo
 from . import schemas
 from .auth import CurrentUser
 from .common import _project_or_404, boundary_in, layer_in, terrain_surface
-from .db import execute, fetch_all, fetch_one
+from .db import execute, fetch_all, fetch_one, transaction
 
 router = APIRouter()
 
@@ -53,14 +53,14 @@ def _to_lnglat(geom, crs: str):
     return project_geometry(geom, crs, "EPSG:4326")
 
 
-def _insert(project_id: UUID, kind: str, label: str, geom_ll, params: dict, props: dict, group_id: str | None) -> None:
-    execute(
-        """INSERT INTO design_elements (project_id, kind, group_id, label, geom, params, properties)
+INSERT_SQL = """INSERT INTO design_elements (project_id, kind, group_id, label, geom, params, properties)
            VALUES (:pid, :kind, :gid, :label, ST_SetSRID(ST_GeomFromWKB(:g), 4326), CAST(:params AS jsonb),
-                   CAST(:props AS jsonb))""",
-        pid=str(project_id), kind=kind, gid=group_id, label=label, g=wkb.dumps(geom_ll),
-        params=json.dumps(params), props=json.dumps(props),
-    )
+                   CAST(:props AS jsonb))"""
+
+
+def _row(project_id: UUID, kind: str, label: str, geom_ll, params: dict, props: dict, group_id: str | None) -> dict:
+    return {"pid": str(project_id), "kind": kind, "gid": group_id, "label": label, "g": wkb.dumps(geom_ll),
+            "params": json.dumps(params), "props": json.dumps(props)}
 
 
 def _site_context(project_id: UUID):
@@ -87,12 +87,14 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
     if not kp_rows:
         raise HTTPException(404, f"Keypoint {body.keypoint_id} not found")
     kp: Point = kp_rows[0][0]
-    stops = geo.keyline_stops(ridges, valleys, kp)
+    step = max(surface.res, 1.0)
+    stops = geo.Stops(geo.keyline_stops(ridges, valleys, kp), step)
     try:
-        keyline, arms = geo.keyline_through(surface, (kp.x, kp.y), body.grade, stops=stops, within=boundary)
+        keyline, arms = geo.keyline_through(surface, (kp.x, kp.y), body.grade, stops=stops, within=boundary, step=step)
     except ValueError as e:
         raise HTTPException(422, str(e))
     valley = geo.valley_near(valleys, kp)
+    truncated = False
 
     if body.pattern == "parallel":
         lines = geo.parallel_pattern(surface, keyline, body.spacing_m, boundary, max_lines=body.max_lines,
@@ -105,20 +107,17 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
         others = unary_union(valleys).difference(valley.buffer(5)) if valleys else None
         stop_parts = [g for g in (ridges, others) if g is not None and not g.is_empty]
         graded_stops = unary_union(stop_parts) if stop_parts else None
-        lines = geo.graded_pattern(surface, valley, (kp.x, kp.y), body.spacing_m, body.grade, boundary,
-                                   stops=graded_stops, max_lines=body.max_lines)
+        lines, truncated = geo.graded_pattern(surface, valley, (kp.x, kp.y), body.spacing_m, body.grade, boundary,
+                                              stops=geo.Stops(graded_stops, step), max_lines=body.max_lines, step=step)
     else:
         lines = []
 
-    # Replace this keypoint's previous pattern.
-    execute("DELETE FROM design_elements WHERE project_id = :pid AND params->>'keypoint_id' = :kp",
-            pid=str(project_id), kp=body.keypoint_id)
     group_id = str(uuid4())
     params = {**body.model_dump(), "terrain_grade": grade_label}
     draft = grade_label != "design"
     km = geo.line_metrics(surface, keyline, valley)
-    _insert(project_id, "keyline", f"Keyline {body.keypoint_id}", _to_lnglat(keyline, t["dem_crs"]), params,
-            {**km, "keypoint_id": body.keypoint_id, "draft": draft, "stops": [a.stop for a in arms]}, group_id)
+    rows = [_row(project_id, "keyline", f"Keyline {body.keypoint_id}", _to_lnglat(keyline, t["dem_crs"]), params,
+                 {**km, "keypoint_id": body.keypoint_id, "draft": draft, "stops": [a.stop for a in arms]}, group_id)]
 
     # Rip lines are labelled top to bottom, which is also the default pass order.
     measured = []
@@ -131,8 +130,14 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
     for i, (pl, m) in enumerate(measured, start=1):
         notes = geo.check_rip(m)
         flagged += bool(notes)
-        _insert(project_id, "rip", f"R{i}", _to_lnglat(pl.geom, t["dem_crs"]), params,
-                {**pl.props, **m, "pass": i, "notes": notes, "draft": draft}, group_id)
+        rows.append(_row(project_id, "rip", f"R{i}", _to_lnglat(pl.geom, t["dem_crs"]), params,
+                         {**pl.props, **m, "pass": i, "notes": notes, "draft": draft}, group_id))
+    # Replace this keypoint's previous pattern in one transaction, so a failure leaves the old one intact.
+    with transaction() as tx:
+        tx.execute("SELECT pg_advisory_xact_lock(hashtext(:k))", k=f"{project_id}:{body.keypoint_id}")
+        tx.execute("DELETE FROM design_elements WHERE project_id = :pid AND params->>'keypoint_id' = :kp",
+                   pid=str(project_id), kp=body.keypoint_id)
+        tx.execute_many(INSERT_SQL, rows)
     total = sum(pl.geom.length for pl, _ in measured)
     treated = 0.0
     if measured:
@@ -141,6 +146,8 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
         notes_all.append(f"{flagged} of {len(measured)} rip lines have notes (water toward the valley or steep fall).")
     if draft:
         notes_all.append("Draft on planning-grade terrain: confirm with a field survey before ripping.")
+    if truncated:
+        notes_all.append("Stopped early to keep the request quick; widen the spacing to cover the whole valley.")
     if any(a.stop == "terrain" for a in arms):
         notes_all.append("One arm of the keyline ended where the ground went flat or broke away, before a ridge.")
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
+import threading
 from functools import lru_cache
 from pathlib import Path
 from typing import BinaryIO
@@ -38,7 +39,7 @@ class LocalStorage:
         p.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(local_path, p)
 
-    def local_path(self, key: str) -> str:
+    def local_path(self, key: str, version: str | None = None) -> str:
         """A readable local path for the object (the file itself for local storage)."""
         return str(self._path(key))
 
@@ -64,11 +65,14 @@ class GcsStorage:
     def save_file(self, key: str, local_path: str) -> None:
         self._blob(key).upload_from_filename(local_path)
 
-    def local_path(self, key: str) -> str:
-        dest = self.cache / key
+    def local_path(self, key: str, version: str | None = None) -> str:
+        """A local copy of the object. Pass `version` for objects rewritten in place (e.g. a re-run DEM)."""
+        dest = self.cache / (version or "_") / key
         if not dest.exists():
             dest.parent.mkdir(parents=True, exist_ok=True)
-            self._blob(key).download_to_filename(str(dest))
+            tmp = dest.with_name(f".{dest.name}.{os.getpid()}.{threading.get_ident()}.part")
+            self._blob(key).download_to_filename(str(tmp))
+            os.replace(tmp, dest)  # atomic: concurrent readers never see a partial file
         return str(dest)
 
     def exists(self, key: str) -> bool:

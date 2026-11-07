@@ -81,7 +81,7 @@ def test_graded_pattern_lines_each_hold_grade(site):
     dem, boundary, ridges, valleys, kp = site
     surface = Surface(dem)
     valley = valley_near(valleys, kp)
-    lines = graded_pattern(surface, valley, (kp.x, kp.y), 15.0, DEFAULT_GRADE, boundary, stops=keyline_stops(ridges, valleys, kp, hole_m=1e6), max_lines=8)
+    lines, truncated = graded_pattern(surface, valley, (kp.x, kp.y), 15.0, DEFAULT_GRADE, boundary, stops=keyline_stops(ridges, valleys, kp, hole_m=1e6), max_lines=8)
     assert len(lines) >= 4
     for pl in lines:
         m = line_metrics(surface, pl.geom, valley)
@@ -117,3 +117,39 @@ def test_swale_is_level_and_sized(site):
     assert m["cut_volume_m3"] == pytest.approx(m["length_m"] * (2 / 3) * 2.0 * 0.5, rel=0.01)
     assert m["catchment_m2"] > 1000  # the slope above it drains onto it
     assert m["terrain_slope_max_pct"] < 15 or notes
+
+
+def test_untraceable_keyline_is_a_clean_error(site):
+    dem, boundary, ridges, valleys, kp = site
+    surface = Surface(dem)
+    from shapely.geometry import Point as P
+
+    outside = P(boundary.bounds[0] - 5, boundary.bounds[1] + 50)
+    with pytest.raises(ValueError):
+        keyline_through(surface, (outside.x, outside.y), within=boundary)
+    with pytest.raises(ValueError):  # grade far steeper than the ground: no crossing on either side
+        keyline_through(surface, (kp.x, kp.y), 0.5, within=boundary)
+
+
+def test_swale_on_closed_contour_runs_start_to_end():
+    from affine import Affine
+
+    from tr_geo.dem import Dem
+
+    n = 200
+    r, c = np.mgrid[0:n, 0:n].astype(float)
+    z = 100 - 0.15 * np.hypot(r - n / 2, c - n / 2)  # a cone: every contour is a closed ring
+    dem = Dem(z, Affine(1, 0, 0, 0, -1, n), "EPSG:32610")
+    surface = Surface(dem, smooth_m=0)
+    rng = np.random.default_rng(1)
+    for _ in range(40):
+        a0, a1 = rng.uniform(0, 2 * np.pi, 2)
+        rad = 60
+        start = (n / 2 + rad * np.cos(a0), n / 2 + rad * np.sin(a0))
+        end = (n / 2 + rad * np.cos(a1), n / 2 + rad * np.sin(a1))
+        try:
+            sw = swale_on_contour(surface, start, end)
+        except ValueError:
+            continue
+        s0, s1 = sw.geom.coords[0], sw.geom.coords[-1]
+        assert np.hypot(s0[0] - start[0], s0[1] - start[1]) < np.hypot(s1[0] - start[0], s1[1] - start[1])

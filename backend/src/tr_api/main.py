@@ -192,7 +192,7 @@ def get_job(job_id: UUID, user: CurrentUser):
 @app.get("/api/projects/{project_id}/terrain", response_model=schemas.TerrainSummary)
 def get_terrain(project_id: UUID, user: CurrentUser):
     _project_or_404(project_id, user)
-    row = fetch_one("SELECT summary, dem_path FROM terrain_results WHERE project_id = :id", id=str(project_id))
+    row = fetch_one("SELECT summary, dem_path, job_id FROM terrain_results WHERE project_id = :id", id=str(project_id))
     if not row:
         raise HTTPException(404, "No terrain model yet")
     s = row["summary"]
@@ -204,13 +204,13 @@ def get_terrain(project_id: UUID, user: CurrentUser):
         "dem_url": f"/files/{row['dem_path']}",
         "dem_tiles_url": f"/api/projects/{project_id}/tiles/dem/{{z}}/{{x}}/{{y}}.png",
         "slope_tiles_url": f"/api/projects/{project_id}/tiles/slope/{{z}}/{{x}}/{{y}}.png",
-        "dem_bounds": _dem_bounds(row["dem_path"]),
+        "dem_bounds": _dem_bounds(row["dem_path"], str(row["job_id"] or "")),
     }
 
 
-def _dem_bounds(dem_path: str) -> list[float] | None:
+def _dem_bounds(dem_path: str, version: str) -> list[float] | None:
     try:
-        return tiles.dem_bounds_lnglat(get_storage().local_path(dem_path))
+        return tiles.dem_bounds_lnglat(get_storage().local_path(dem_path, version))
     except Exception:  # bounds are a hint for the map; never fail the summary over them
         return None
 
@@ -255,7 +255,7 @@ def update_keypoint(project_id: UUID, kp_id: str, body: schemas.KeypointUpdate, 
 @app.get("/api/projects/{project_id}/profile", response_model=schemas.Profile)
 def get_profile(project_id: UUID, user: CurrentUser, coords: str = Query(..., description="lng,lat;lng,lat"), samples: int = Query(200, ge=2, le=2000)):
     _project_or_404(project_id, user)
-    row = fetch_one("SELECT dem_path FROM terrain_results WHERE project_id = :id", id=str(project_id))
+    row = fetch_one("SELECT dem_path, job_id FROM terrain_results WHERE project_id = :id", id=str(project_id))
     if not row:
         raise HTTPException(404, "No terrain model yet")
     try:
@@ -263,7 +263,8 @@ def get_profile(project_id: UUID, user: CurrentUser, coords: str = Query(..., de
         line = LineString(pts)
     except Exception:
         raise HTTPException(422, "coords must look like lng,lat;lng,lat")
-    dem = _load_dem(get_storage().local_path(row["dem_path"]))
+    version = str(row["job_id"] or "")
+    dem = _load_dem(get_storage().local_path(row["dem_path"], version), version)
     d, z = sample_line(dem, project_geometry(line, "EPSG:4326", dem.crs), samples)
     return {"distance_m": [round(float(v), 2) for v in d],
             "elevation_m": [None if v != v else round(float(v), 2) for v in z]}

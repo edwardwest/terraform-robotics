@@ -95,6 +95,22 @@ class Surface:
 # ---- Graded line tracing ------------------------------------------------------------------------
 
 
+class Stops:
+    """Lines that end a trace (ridges, other valleys), buffered and prepared once for many traces.
+
+    Traces stop a little before touching a stop line: valley floors are notched, so a trace can lose its
+    crossing a step short of the valley line itself.
+    """
+
+    def __init__(self, geom: BaseGeometry | None, step: float):
+        self.geom = geom if geom is not None and not geom.is_empty else None
+        self.prepared = prep(self.geom.buffer(1.5 * step)) if self.geom is not None else None
+
+    @classmethod
+    def of(cls, stops: "Stops | BaseGeometry | None", step: float) -> "Stops":
+        return stops if isinstance(stops, Stops) else cls(stops, step)
+
+
 @dataclass
 class Trace:
     points: list[tuple[float, float]]
@@ -113,17 +129,19 @@ def trace_graded(
     *,
     step: float | None = None,
     max_length: float = 3000.0,
-    stops: BaseGeometry | None = None,
+    stops: "Stops | BaseGeometry | None" = None,
     within: Polygon | None = None,
     z_start: float | None = None,
     search_deg: float = 80.0,
+    ignore_stops_within: float = 0.0,
 ) -> Trace:
     """Walk from `start` holding a constant fall of `grade` per metre, staying close to `heading`.
 
     At each step the next point is where the surface crosses the target elevation on an arc of radius
     `step` ahead; among several crossings the one closest to the current heading wins, so the line keeps
     going the same way along the slope. Stops at the `within` boundary, at any line in `stops` (ridges),
-    where no crossing exists (terrain too flat or a cliff), or at `max_length`.
+    where no crossing exists (terrain too flat or a cliff), or at `max_length`. Stop lines closer than
+    `ignore_stops_within` metres to `start` are ignored (the valley a keyline starts in).
     """
     step = step or max(surface.res, 1.0)
     x, y = start
@@ -132,9 +150,8 @@ def trace_graded(
         raise ValueError("Start point is outside the terrain model")
     pts = [(x, y)]
     within_p = prep(within) if within is not None else None
-    # stop a little before touching a stop line: valley floors are notched, so the trace can lose its
-    # crossing a step short of the valley line itself
-    stops_p = prep(stops.buffer(1.5 * step)) if stops is not None and not stops.is_empty else None
+    st = Stops.of(stops, step)
+    origin = Point(start)
     offsets = np.radians(np.linspace(-search_deg, search_deg, int(2 * search_deg) + 1))
     s = 0.0
     reason = "length"
@@ -160,8 +177,9 @@ def trace_graded(
                 pts.append(_first_point(hit, (x, y)))
             reason = "boundary"
             break
-        if stops_p is not None and s > 2 * step and stops_p.intersects(seg):
-            pts.append(_first_point(stops, (x, y)))
+        if (st.prepared is not None and s > 2 * step and st.prepared.intersects(seg)
+                and origin.distance(Point(nx, ny)) > ignore_stops_within):
+            pts.append(_first_point(st.geom, (x, y)))
             reason = "ridge"
             break
         pts.append((nx, ny))
@@ -180,6 +198,8 @@ def _first_point(geom: BaseGeometry, origin: tuple[float, float]) -> tuple[float
 
 def _join_arms(a: Trace, b: Trace) -> LineString:
     coords = list(reversed(a.points)) + b.points[1:]
+    if len(coords) < 2:
+        raise ValueError("The keyline could not be traced from this keypoint: the ground is too flat or too steep for this grade")
     return LineString(coords)
 
 
@@ -188,19 +208,23 @@ def keyline_through(
     keypoint: tuple[float, float],
     grade: float = DEFAULT_GRADE,
     *,
-    stops: BaseGeometry | None = None,
+    stops: "Stops | BaseGeometry | None" = None,
     within: Polygon | None = None,
     step: float | None = None,
     max_arm_m: float = 2000.0,
 ) -> tuple[LineString, list[Trace]]:
     """The keyline through a keypoint: two arms, each falling at `grade` toward a ridge."""
+    step = step or max(surface.res, 1.0)
+    if within is not None and not within.contains(Point(keypoint)):
+        raise ValueError("The keypoint is outside the property")
     down = surface.downhill_heading(*keypoint)
     z0 = surface.z1(*keypoint)
-    # leave a small hole around the keypoint so the valley it sits in does not stop the trace at once
-    local_stops = stops.difference(Point(keypoint).buffer(3 * (step or surface.res) + 2)) if stops is not None else None
+    st = Stops.of(stops, step)
+    # ignore stop lines right around the keypoint so the valley it sits in does not stop the trace at once
+    hole = 3 * step + 2
     arms = [
         trace_graded(surface, keypoint, grade, down + s * math.pi / 2, step=step, max_length=max_arm_m,
-                     stops=local_stops, within=within, z_start=z0)
+                     stops=st, within=within, z_start=z0, ignore_stops_within=hole)
         for s in (1, -1)
     ]
     line = _join_arms(arms[0], arms[1])
@@ -295,11 +319,20 @@ def graded_pattern(
     grade: float,
     within: Polygon,
     *,
-    stops: BaseGeometry | None = None,
+    stops: "Stops | BaseGeometry | None" = None,
     max_lines: int = 300,
     step: float | None = None,
-) -> list[PatternLine]:
-    """Lines that each hold `grade`, seeded every `spacing` metres along the valley through the keypoint."""
+    budget_s: float | None = 45.0,
+) -> tuple[list[PatternLine], bool]:
+    """Lines that each hold `grade`, seeded every `spacing` metres along the valley through the keypoint.
+
+    Returns (lines, truncated); `truncated` is True when the time budget ran out before every seed was traced.
+    """
+    import time
+
+    deadline = time.monotonic() + budget_s if budget_s else None
+    step = step or max(surface.res, 1.0)
+    stops = Stops.of(stops, step)
     if spacing <= 0:
         raise ValueError("Spacing must be positive")
     kp_d = seeds_along.project(Point(keypoint))
@@ -313,7 +346,11 @@ def graded_pattern(
         k += 1
     out: list[PatternLine] = []
     z_kp = surface.z1(*keypoint)
+    truncated = False
     for d in offsets[:max_lines]:
+        if deadline is not None and time.monotonic() > deadline:
+            truncated = True
+            break
         p = seeds_along.interpolate(d)
         if not within.contains(p):
             continue
@@ -325,7 +362,7 @@ def graded_pattern(
             z = surface.z1(p.x, p.y)
             out.append(PatternLine(line, {"seed_offset_m": round(d - kp_d, 2),
                                           "position": "above" if z > z_kp else "below"}))
-    return out
+    return out, truncated
 
 
 # ---- Line checks ------------------------------------------------------------------------------
@@ -417,22 +454,27 @@ def swale_on_contour(surface: Surface, start: tuple[float, float], end: tuple[fl
         raise ValueError("No contour found through the start point")
     a, b = best.project(sp), best.project(Point(end))
     piece = ops.substring(best, min(a, b), max(a, b))
-    if best.is_ring:
-        # a closed contour can be walked either way; take the shorter way round
-        other = best.length - piece.length
-        if other < piece.length:
-            first = ops.substring(best, max(a, b), best.length)
-            second = ops.substring(best, 0, min(a, b))
-            piece = LineString(list(first.coords) + list(second.coords)[1:])
+    wrapped = False
+    if best.is_ring and best.length - piece.length < piece.length:
+        # a closed contour can be walked either way; take the shorter way round, through the ring's start
+        first = ops.substring(best, max(a, b), best.length)
+        second = ops.substring(best, 0, min(a, b))
+        piece = LineString(list(first.coords) + list(second.coords)[1:])
+        wrapped = True
     if not isinstance(piece, LineString) or piece.length < 2 * surface.res:
         raise ValueError("The swale is too short; pick an end point further along the slope")
-    if a > b:
+    # the straight piece runs min→max and the wrapped piece max→min; orient both to run start→end
+    if (a > b) != wrapped:
         piece = LineString(list(piece.coords)[::-1])
     return Swale(piece, z0, float(best.interpolate(best.project(Point(end))).distance(Point(end))))
 
 
-def upslope_area(surface: Surface, line: LineString, window_m: float = 600.0) -> tuple[float, bool]:
-    """Area (m²) that drains onto `line`, within a window around it. The flag is True if the window clipped it."""
+def upslope_area(surface: Surface, line: LineString, window_m: float = 500.0) -> tuple[float, bool]:
+    """Area (m²) that drains onto `line`, within a window around it. The flag is True if the window clipped it.
+
+    Runs on a depression-filled copy (so pits and flats in fine LiDAR do not cut the catchment short), coarsened
+    to about 2 m cells to keep the fill fast.
+    """
     from rasterio.features import rasterize
 
     dem = surface.dem
@@ -446,6 +488,14 @@ def upslope_area(surface: Surface, line: LineString, window_m: float = 600.0) ->
     from affine import Affine
 
     t = dem.transform @ Affine.translation(c0, r0)
+    f = max(int(round(2.0 / dem.res)), 1)
+    if f > 1:
+        rr, cc = (z.shape[0] // f) * f, (z.shape[1] // f) * f
+        with np.errstate(invalid="ignore"):
+            z = np.nanmean(z[:rr, :cc].reshape(rr // f, f, cc // f, f), axis=(1, 3))
+        t = t @ Affine.scale(f)
+    cell = dem.res * f
+    z = hydrology.fill_depressions(z)
     mark = rasterize([(line, 1)], out_shape=z.shape, transform=t, all_touched=True).astype(bool).reshape(-1)
     downstream = hydrology.d8_downstream(z)
     flat = z.reshape(-1)
@@ -459,7 +509,7 @@ def upslope_area(surface: Surface, line: LineString, window_m: float = 600.0) ->
             reach[i] = True
     grid = reach.reshape(z.shape)
     clipped = bool(grid[0, :].any() or grid[-1, :].any() or grid[:, 0].any() or grid[:, -1].any())
-    area = float((reach & ~mark).sum() * dem.res**2)
+    area = float((reach & ~mark).sum() * cell**2)
     return area, clipped
 
 

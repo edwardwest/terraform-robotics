@@ -389,10 +389,9 @@ def export_dxf(project_id: UUID, user: CurrentUser):
 
 def _berm_line(swale: LineString, width_m: float, terrain: dict) -> LineString | None:
     """The berm runs along the downhill side of the swale."""
-    from .common import load_surface
-    from .storage import get_storage
+    from .common import dem_local_path, load_surface, terrain_version
 
-    surface = load_surface(get_storage().local_path(terrain["dem_path"]))
+    surface = load_surface(dem_local_path(terrain), terrain_version(terrain))
     off = width_m / 2 + 0.6
     cands = []
     for sign in (1, -1):

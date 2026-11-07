@@ -27,3 +27,31 @@ def fetch_all(sql: str, **params):
 def execute(sql: str, **params) -> None:
     with get_engine().begin() as conn:
         conn.execute(text(sql), params)
+
+
+class _Tx:
+    def __init__(self, conn):
+        self.conn = conn
+
+    def execute(self, sql: str, **params) -> None:
+        self.conn.execute(text(sql), params)
+
+    def execute_many(self, sql: str, rows: list[dict]) -> None:
+        if rows:
+            self.conn.execute(text(sql), rows)
+
+    def fetch_one(self, sql: str, **params):
+        row = self.conn.execute(text(sql), params).mappings().first()
+        return dict(row) if row else None
+
+
+def transaction():
+    """`with transaction() as tx:` runs several statements atomically."""
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _cm():
+        with get_engine().begin() as conn:
+            yield _Tx(conn)
+
+    return _cm()

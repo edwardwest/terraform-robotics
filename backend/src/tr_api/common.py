@@ -39,17 +39,18 @@ def _project_or_404(project_id: UUID, user: dict) -> dict:
 
 
 @lru_cache(maxsize=16)
-def load_dem(path: str):
+def load_dem(path: str, version: str | None = None):
+    """Cached DEM; `version` (the terrain job id) keeps a re-run from being served stale."""
     return read_geotiff(path)
 
 
 @lru_cache(maxsize=8)
-def load_surface(path: str) -> Surface:
-    return Surface(load_dem(path))
+def load_surface(path: str, version: str | None = None) -> Surface:
+    return Surface(load_dem(path, version))
 
 
 def terrain_or_404(project_id: UUID) -> dict:
-    row = fetch_one("SELECT summary, dem_path, dem_crs FROM terrain_results WHERE project_id = :id", id=str(project_id))
+    row = fetch_one("SELECT summary, dem_path, dem_crs, job_id FROM terrain_results WHERE project_id = :id", id=str(project_id))
     if not row:
         raise HTTPException(404, "No terrain model yet")
     return row
@@ -80,5 +81,14 @@ def layer_in(project_id: UUID, layer: str, srid: int, where: str = "", **params)
 def terrain_surface(project_id: UUID):
     """(terrain row, Surface, srid) for a project with a terrain model."""
     t = terrain_or_404(project_id)
-    path = get_storage().local_path(t["dem_path"])
-    return t, load_surface(path), srid_of(t["dem_crs"])
+    version = terrain_version(t)
+    path = get_storage().local_path(t["dem_path"], version)
+    return t, load_surface(path, version), srid_of(t["dem_crs"])
+
+
+def terrain_version(t: dict) -> str:
+    return str(t.get("job_id") or "")
+
+
+def dem_local_path(t: dict) -> str:
+    return get_storage().local_path(t["dem_path"], terrain_version(t))
