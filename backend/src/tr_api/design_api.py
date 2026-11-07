@@ -149,8 +149,8 @@ def create_keyline(project_id: UUID, body: schemas.KeylineCreate, user: CurrentU
     if toward:
         notes_all.append(f"{toward} of {len(measured)} rip lines carry some water back toward the valley.")
     if steep:
-        notes_all.append(f"{steep} of {len(measured)} rip lines fall steeper than 1:100 somewhere; watch for scour. "
-                         "On steep ground, 'Each line graded' keeps every line at the design grade.")
+        hint = " On steep ground, 'Each line graded' keeps every line at the design grade." if body.pattern == "parallel" else ""
+        notes_all.append(f"{steep} of {len(measured)} rip lines fall steeper than 1:100 somewhere; watch for scour.{hint}")
     if draft:
         notes_all.append("Draft on planning-grade terrain: confirm with a field survey before ripping.")
     if truncated:
