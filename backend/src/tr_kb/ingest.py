@@ -85,13 +85,21 @@ def ingest_nrcs(limit: int | None = None, state: str = NRCS_STATE, pause_s: floa
 
 
 def ingest_plants(url: str = PLANTS_URL) -> int:
-    with httpx.Client(timeout=300, follow_redirects=True, headers={"User-Agent": nrcs.USER_AGENT}) as client:
-        resp = client.get(url)
-        resp.raise_for_status()
-        data = resp.content
-    rows = plants.parse_dwca(data)
-    with _engine().begin() as conn:
-        n = upsert_species(conn, rows, plants.SOURCE, plants.LICENSE)
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".archive") as tmp:
+        with httpx.Client(timeout=300, follow_redirects=True, headers={"User-Agent": nrcs.USER_AGENT}) as client:
+            with client.stream("GET", url) as resp:
+                resp.raise_for_status()
+                for block in resp.iter_bytes(1 << 20):
+                    tmp.write(block)
+        tmp.flush()
+        rows = plants.parse_dwca(tmp.name)
+    log.info("plants: %d species parsed", len(rows))
+    n = 0
+    for i in range(0, len(rows), 2000):
+        with _engine().begin() as conn:
+            n += upsert_species(conn, rows[i : i + 2000], plants.SOURCE, plants.LICENSE)
     log.info("plants: %d species", n)
     return n
 

@@ -182,3 +182,60 @@ def test_efotg_fips():
     assert efotg.fips("ca") == "06" and efotg.fips("6") == "06"
     with pytest.raises(ValueError):
         efotg.fips("ZZ")
+
+
+def _eol_dwca() -> bytes:
+    """A miniature of the EOL USDA PLANTS export: <table> specs, occurrences, IRI values, min/max statistics."""
+    def table(row_type, loc, terms):
+        fields = "".join(f'<field index="{i}" term="{t}"/>' for i, t in enumerate(terms))
+        return (f'<table encoding="UTF-8" fieldsTerminatedBy="\\t" linesTerminatedBy="\\n" ignoreHeaderLines="1" '
+                f'rowType="{row_type}"><files><location>{loc}</location></files>{fields}</table>')
+    dwc, eol = "http://rs.tdwg.org/dwc/terms/", "http://eol.org/schema/"
+    meta = ('<archive xmlns="http://rs.tdwg.org/dwc/text/">'
+            + table(dwc + "Taxon", "taxon.tab", [dwc + "taxonID", "http://purl.org/dc/terms/source", dwc + "scientificName",
+                                                  dwc + "family", dwc + "taxonRank", dwc + "taxonomicStatus"])
+            + table(dwc + "Occurrence", "occurrence_specific.tab", [dwc + "occurrenceID", dwc + "taxonID"])
+            + table(dwc + "MeasurementOrFact", "measurement_or_fact_specific.tab",
+                    [dwc + "measurementID", dwc + "occurrenceID", dwc + "measurementType", dwc + "measurementValue",
+                     dwc + "statisticalMethod", dwc + "measurementRemarks"])
+            + "</archive>")
+    taxon = ("taxonID\tsource\tscientificName\tfamily\ttaxonRank\ttaxonomicStatus\n"
+             "CECO\tx\tCeanothus cordulatus Kellogg\tRhamnaceae\tspecies\tvalid\n"
+             "CEANO\tx\tCeanothus L.\tRhamnaceae\tgenus\tvalid\n")
+    occ = "occurrenceID\ttaxonID\nO1\tCECO\nO2\tCECO\nO3\tCECO\nO4\tCECO\nO5\tCECO\nO6\tCECO\nO7\tCECO\nO8\tCEANO\n"
+    T = "http://eol.org/schema/terms/"
+    mof = ("measurementID\toccurrenceID\tmeasurementType\tmeasurementValue\tstatisticalMethod\tmeasurementRemarks\n"
+           f"M1\tO1\thttp://purl.obolibrary.org/obo/FLOPO_0900032\t{T}shrub\t\tSource term: Growth Habit. Some text\n"
+           f"M2\tO2\t{T}ShadeTolerance\thttp://purl.obolibrary.org/obo/PATO_0002394\t\tThese data\n"
+           f"M3\tO3\t{T}SoilPH\t5.5\thttp://semanticscience.org/resource/SIO_001113\tThese data\n"
+           f"M4\tO3\t{T}SoilPH\t7\thttp://semanticscience.org/resource/SIO_001114\tThese data\n"
+           f"M5\tO4\t{T}TemperatureTolerance\t-13\thttp://semanticscience.org/resource/SIO_001113\tThese data\n"
+           f"M6\tO5\t{T}Present\t5332921\t\tCalifornia\n"
+           f"M7\tO6\t{T}SoilRequirements\t{T}coarseSoilYes\t\tThese data\n"
+           f"M8\tO6\t{T}SoilRequirements\t{T}fineSoilNo\t\tThese data\n"
+           f"M9\tO7\thttp://purl.obolibrary.org/obo/GO_0009399\thttp://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C25227\t\tThese data\n"
+           f"M10\tO8\t{T}Present\t1\t\tOregon\n")
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as t:
+        for name, content in (("meta.xml", meta), ("taxon.tab", taxon), ("occurrence_specific.tab", occ),
+                              ("measurement_or_fact_specific.tab", mof)):
+            data = content.encode()
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            t.addfile(info, io.BytesIO(data))
+    return buf.getvalue()
+
+
+def test_parse_eol_dwca(tmp_path):
+    path = tmp_path / "plants.tar.gz"
+    path.write_bytes(_eol_dwca())
+    rows = {r["symbol"]: r for r in plants.parse_dwca(str(path))}
+    assert set(rows) == {"CECO"}  # genus rows are dropped
+    t = rows["CECO"]["traits"]
+    assert t["growth_habit"] == "Shrub"
+    assert t["shade_tolerance"] == "Intolerant"
+    assert (t["ph_min"], t["ph_max"]) == (5.5, 7)
+    assert t["min_temp_f"] == -13
+    assert t["states"] == "California"
+    assert t["soil"] == "Coarse"
+    assert t["nitrogen_fixation"] == "High"
