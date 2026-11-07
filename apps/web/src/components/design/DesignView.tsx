@@ -245,7 +245,8 @@ export function DesignView({ projectId }: { projectId: string }) {
           <div className={styles.form}>
             <fieldset className={styles.group}>
               <legend className="field-label">Keypoint</legend>
-              {keypoints.length === 0 && <p className="app-small">No keypoints on this site.</p>}
+              {data.keypoints && keypoints.length === 0 && <p className="app-small">No keypoints on this site.</p>}
+              {!data.keypoints && <p className="app-small">Loading keypoints.</p>}
               <div className={styles.chips}>
                 {keypoints.map((k) => (
                   <button
@@ -379,7 +380,7 @@ export function DesignView({ projectId }: { projectId: string }) {
           onStart={() => undefined}
           onClear={() => setSelected(null)}
           eyebrow="Line profile"
-          title={profileTitle}
+          title={profileTitle ?? "Pick a line on the map."}
           emptyText="Select a keyline, rip line or swale on the map to see the ground along it."
           showDraw={false}
         />

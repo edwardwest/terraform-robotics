@@ -98,8 +98,8 @@ export const designLayers: LayerSpecification[] = [
     filter: ["==", ["get", "kind"], "rip"],
     layout: { "line-cap": "round", "line-join": "round" },
     paint: {
-      "line-color": ["case", ["==", ["get", "_flag"], true], "rgba(255,255,255,0.95)", "rgba(255,255,255,0.6)"],
-      "line-width": ["case", ["==", ["get", "_flag"], true], 1.6, 1],
+      "line-color": "rgba(255,255,255,0.45)",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 14, 0.5, 17, 1.2],
     },
   },
   {
