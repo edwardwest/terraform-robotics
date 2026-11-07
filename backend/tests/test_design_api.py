@@ -163,5 +163,16 @@ def test_tiles(client, designed):
     assert 60 < np.median(elev) < 125  # the synthetic terrain spans roughly 70-120 m
     sl = client.get(f"/api/projects/{pid}/tiles/slope/17/{x}/{y}.png")
     assert sl.status_code == 200
-    far = client.get(f"/api/projects/{pid}/tiles/dem/17/0/0.png")
-    assert far.status_code == 200
+    def decoded(path):
+        resp = client.get(path)
+        assert resp.status_code == 200
+        with MemoryFile(resp.content) as mem, mem.open() as img:
+            c = img.read().astype(float)
+        return c[0] * 256 + c[1] + c[2] / 256 - 32768
+
+    # Tiles with no data must sit at the model's base elevation, never -32768 m (that breaks 3D terrain).
+    far = decoded(f"/api/projects/{pid}/tiles/dem/17/0/0.png")
+    assert 60 < far.min() and far.max() < 125
+    lx, ly = _tile_for(lng, lat, 3)  # the whole model is far smaller than one pixel here
+    low = decoded(f"/api/projects/{pid}/tiles/dem/3/{lx}/{ly}.png")
+    assert 60 < low.min() and low.max() < 125

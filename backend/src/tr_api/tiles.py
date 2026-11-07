@@ -87,6 +87,26 @@ def _render(data: np.ndarray) -> bytes:
     return render(data, img_format="PNG")
 
 
+_BASE_ELEV: dict[str, float] = {}
+
+
+def base_elevation(dem_path: str) -> float:
+    """Lowest valid elevation of the model, used where a DEM tile has no data (cached per versioned path)."""
+    if dem_path not in _BASE_ELEV:
+        import rasterio
+
+        with rasterio.open(dem_path) as src:
+            # a decimated read is plenty for a minimum
+            z = src.read(1, out_shape=(max(1, src.height // 8), max(1, src.width // 8)), masked=True)
+        _BASE_ELEV[dem_path] = float(z.min()) if z.count() else 0.0
+    return _BASE_ELEV[dem_path]
+
+
+def _flat_dem(elev: float) -> bytes:
+    """A Terrarium tile at one elevation. Never send black: black decodes to -32768 m and breaks 3D terrain."""
+    return _render(terrarium(np.full((256, 256), elev)))
+
+
 def _empty(kind: str) -> bytes:
     if kind not in EMPTY_PNG_CACHE:
         bands = 3 if kind == "dem" else 4
@@ -117,12 +137,13 @@ def tile(project_id: UUID, kind: str, z: int, x: int, y: int, user: CurrentUser)
         with Reader(path) as src:
             img = src.tile(x, y, z, tilesize=256, resampling_method="bilinear")
     except TileOutsideBounds:
-        return Response(_empty(kind), media_type="image/png", headers=CACHE_HEADERS)
+        body = _flat_dem(base_elevation(dem_path)) if kind == "dem" else _empty(kind)
+        return Response(body, media_type="image/png", headers=CACHE_HEADERS)
     data = img.data[0].astype("float64")
     valid = img.mask > 0
     if kind == "dem":
-        if not valid.any():
-            return Response(_empty(kind), media_type="image/png", headers=CACHE_HEADERS)
+        if not valid.any():  # e.g. low zooms where the whole model is smaller than a pixel
+            return Response(_flat_dem(base_elevation(dem_path)), media_type="image/png", headers=CACHE_HEADERS)
         rgb = terrarium(_fill_nodata(data, valid))
         return Response(_render(rgb), media_type="image/png", headers=CACHE_HEADERS)
     alpha = np.zeros(data.shape, dtype="uint8")

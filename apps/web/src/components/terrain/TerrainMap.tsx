@@ -208,7 +208,8 @@ export function TerrainMap({
       map.addLayer({ id: "slope", type: "raster", source: "slope", paint: { "raster-opacity": 0.8 } }, "contours-minor");
     }
     if (!map.getSource("dem")) {
-      map.addSource("dem", { type: "raster-dem", tiles: [summary.dem_tiles_url], tileSize: 256, encoding: "terrarium", maxzoom: 16, bounds });
+      // Below zoom 8 the model is smaller than a pixel, so don't request those tiles.
+      map.addSource("dem", { type: "raster-dem", tiles: [summary.dem_tiles_url], tileSize: 256, encoding: "terrarium", minzoom: 8, maxzoom: 16, bounds });
       map.addLayer(
         {
           id: "hillshade",
@@ -252,7 +253,16 @@ export function TerrainMap({
     if (!map) return;
     const next = !pitched;
     setPitched(next);
-    if (summary?.dem_tiles_url && map.getSource("dem")) map.setTerrain(next ? { source: "dem", exaggeration: 1.5 } : null);
+    if (summary?.dem_tiles_url) {
+      // 3D terrain gets its own source; sharing the hillshade's source lowers rendering quality in MapLibre.
+      if (next && !map.getSource("dem-terrain")) {
+        map.addSource("dem-terrain", {
+          type: "raster-dem", tiles: [summary.dem_tiles_url], tileSize: 256, encoding: "terrarium", minzoom: 8, maxzoom: 16,
+          bounds: summary.dem_bounds ?? undefined,
+        });
+      }
+      map.setTerrain(next ? { source: "dem-terrain", exaggeration: 1.5 } : null);
+    }
     map.easeTo({ pitch: next ? 60 : 0, bearing: next ? -20 : 0, duration: 600 });
   };
 
