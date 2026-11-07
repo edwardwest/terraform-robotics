@@ -80,6 +80,19 @@ a.step:hover {
   color: var(--fg-faint);
 }
 
+/* With the Assistant button in the header, step labels collapse to numbers (except the current step) sooner. */
+@media (max-width: 1000px) {
+  .step {
+    padding: 0 10px;
+  }
+  .label {
+    display: none;
+  }
+  .active .label {
+    display: inline;
+  }
+}
+
 @media (max-width: 560px) {
   .header {
     padding: 0 16px;
@@ -99,6 +112,7 @@ a.step:hover {
 }
 
 .account {
+  flex-shrink: 0;
   margin-left: var(--space-3);
   display: flex;
   align-items: center;

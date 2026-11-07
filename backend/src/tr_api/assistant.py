@@ -39,6 +39,16 @@ MAX_TURNS = 8
 DESIGN_WORDS = re.compile(r"\b(propose|design|layout|lay out|plan|pattern|keyline|swale|where should|compare)\b", re.I)
 
 log = logging.getLogger("tr_api.assistant")
+if not log.handlers:  # one JSON object per line on stdout, which Cloud Logging stores as a structured entry
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(message)s"))
+    log.addHandler(_h)
+    log.setLevel(logging.INFO)
+    log.propagate = False
+
+
+def _log(severity: str, **fields) -> None:
+    log.info(json.dumps({"severity": severity, **fields}, default=str))
 
 STEPS = ("site", "survey", "terrain", "design", "estimate")
 STEP_NUMBER = {name: i + 1 for i, name in enumerate(STEPS)}
@@ -328,9 +338,8 @@ def converse(project_id: UUID, user: dict, messages: list[dict], allow_planning:
     last_user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
     can_design = "propose_keyline_pattern" in allowed
     model = DESIGN_MODEL if can_design and DESIGN_WORDS.search(last_user) else DEFAULT_MODEL
-    log.info(json.dumps({"event": "assistant_question", "project_id": str(project_id), "step": step,
-                         "tag": question_tag(last_user), "model": model, "turns": len(messages),
-                         "question": last_user[:300]}))
+    _log("INFO", message="assistant_question", event="assistant_question", project_id=str(project_id), step=step,
+         tag=question_tag(last_user), model=model, turns=len(messages), question=last_user[:300])
     client = client_factory()
     convo: list[dict] = [{"role": m["role"], "content": m["content"]} for m in messages]
     system = system_blocks(step, page_context)
@@ -343,6 +352,9 @@ def converse(project_id: UUID, user: dict, messages: list[dict], allow_planning:
         except Exception as e:
             import anthropic
 
+            if isinstance(e, anthropic.APIError):  # keep the provider's own reason (quota, access) in the logs
+                _log("WARNING", message=f"assistant model call failed: {str(e)[:500]}", event="assistant_model_error",
+                     model=model, status=getattr(e, "status_code", None))
             if isinstance(e, anthropic.APIStatusError) and e.status_code in (429, 529):
                 raise HTTPException(503, "The assistant is busy right now. Try again in a minute.")
             if isinstance(e, anthropic.APIError):
