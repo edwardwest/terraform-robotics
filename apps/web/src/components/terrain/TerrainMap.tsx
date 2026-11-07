@@ -249,6 +249,70 @@ export function TerrainMap({
     (map.getSource("section") as GeoJSONSource | undefined)?.setData({ type: "FeatureCollection", features });
   }, [map, section]);
 
+  // 3D orbit controls, like a modelling program: left-drag orbits (bearing and tilt), right-drag or
+  // Shift-drag pans, the wheel zooms. Mouse only; touch keeps MapLibre's gestures (one finger pans,
+  // two fingers rotate and tilt). We intercept mousedown before MapLibre sees it, and swallow the
+  // click that ends a drag so an orbit never places a section point or a swale.
+  useEffect(() => {
+    if (!map || !pitched) return;
+    const outer = map.getContainer();
+    const canvas = map.getCanvas();
+    let mode: "orbit" | "pan" | null = null;
+    let last = { x: 0, y: 0 };
+    let moved = false;
+    const onDown = (e: MouseEvent) => {
+      if (e.target !== canvas || (e.button !== 0 && e.button !== 2)) return;
+      mode = e.button === 2 || e.shiftKey ? "pan" : "orbit";
+      last = { x: e.clientX, y: e.clientY };
+      moved = false;
+      e.stopPropagation();
+      e.preventDefault();
+      canvas.style.cursor = "grabbing";
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!mode) return;
+      const dx = e.clientX - last.x;
+      const dy = e.clientY - last.y;
+      last = { x: e.clientX, y: e.clientY };
+      if (Math.abs(dx) + Math.abs(dy) > 0) moved = true;
+      if (mode === "orbit") {
+        map.jumpTo({ bearing: map.getBearing() + dx * 0.35, pitch: Math.max(0, Math.min(85, map.getPitch() - dy * 0.3)) });
+      } else {
+        map.panBy([-dx, -dy], { animate: false });
+      }
+    };
+    const onUp = () => {
+      if (!mode) return;
+      mode = null;
+      canvas.style.cursor = "";
+    };
+    const onClick = (e: MouseEvent) => {
+      if (moved) {
+        moved = false;
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+    const onMenu = (e: MouseEvent) => e.preventDefault();
+    outer.addEventListener("mousedown", onDown, true);
+    outer.addEventListener("click", onClick, true);
+    outer.addEventListener("contextmenu", onMenu, true);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      outer.removeEventListener("mousedown", onDown, true);
+      outer.removeEventListener("click", onClick, true);
+      outer.removeEventListener("contextmenu", onMenu, true);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      canvas.style.cursor = "";
+    };
+  }, [map, pitched]);
+
+  const resetView = () => {
+    map?.easeTo({ pitch: 60, bearing: -20, duration: 600 });
+  };
+
   const toggle3d = () => {
     if (!map) return;
     const next = !pitched;
@@ -294,10 +358,18 @@ export function TerrainMap({
         <button type="button" className="icon-btn" aria-label="Zoom out" onClick={() => map?.zoomOut()}>
           <IconMinus />
         </button>
+        {pitched && (
+          <button type="button" className="chip" onClick={resetView}>
+            Reset view
+          </button>
+        )}
         <button type="button" className="chip" aria-pressed={pitched} onClick={toggle3d}>
           <IconRotate3d size={16} /> {pitched ? "Flat view" : "Tilt to 3D"}
         </button>
       </div>
+      {pitched && (
+        <p className={styles.hint}>Drag to orbit. Right-drag or Shift-drag to pan. Scroll to zoom.</p>
+      )}
       {error && <p className={`error-text ${styles.err}`} role="alert">{error}</p>}
     </div>
   );

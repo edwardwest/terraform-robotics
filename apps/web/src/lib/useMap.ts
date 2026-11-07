@@ -23,7 +23,7 @@ export function useMap(opts: Omit<MapOptions, "container" | "style"> = {}) {
         zoom: 3,
         attributionControl: { compact: true },
         dragRotate: true,
-        maxPitch: 75,
+        maxPitch: 85,
         ...optsRef.current,
       });
       m = created;
