@@ -206,16 +206,23 @@ button, input, select, textarea {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: border-color var(--fade);
+  transition: border-color var(--fade), background-color var(--fade), color var(--fade);
 }
 
-.chip:hover:not(:disabled),
-.chip[aria-pressed="true"] {
+.chip:hover:not(:disabled) {
   border-color: var(--border-strong);
 }
 
+/* Selected: inverted (white fill, black text) so it reads at a glance against unselected pills. */
 .chip[aria-pressed="true"] {
-  background: var(--ink-400);
+  background: var(--white);
+  border-color: var(--white);
+  color: var(--ink-0);
+}
+
+.chip[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--stone-200);
+  border-color: var(--stone-200);
 }
 
 .chip:disabled {

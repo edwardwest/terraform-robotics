@@ -41,6 +41,11 @@
   gap: var(--space-1);
 }
 
+/* A legend isn't a flex item, so the fieldset's gap doesn't reach it; space it explicitly. */
+.group > legend {
+  padding: 0 0 var(--space-2);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
