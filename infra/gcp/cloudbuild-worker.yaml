@@ -1,0 +1,21 @@
+# Worker image only: build, push, and point the terrain-worker job at it (kb.sh reuses that image).
+#   gcloud builds submit --config infra/gcp/cloudbuild-worker.yaml --substitutions=SHORT_SHA=$(git rev-parse --short HEAD) .
+substitutions:
+  _REGION: us-west1
+  _REPO: terraform-robotics
+options:
+  dynamicSubstitutions: true
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/worker:${SHORT_SHA}
+steps:
+  - id: build-worker
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "backend/Dockerfile.worker", "-t", "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/worker:${SHORT_SHA}", "backend"]
+  - id: push-worker
+    name: gcr.io/cloud-builders/docker
+    args: ["push", "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/worker:${SHORT_SHA}"]
+  - id: update-job
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args: ["run", "jobs", "update", "terrain-worker", "--region=${_REGION}",
+           "--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/worker:${SHORT_SHA}"]
