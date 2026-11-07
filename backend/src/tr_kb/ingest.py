@@ -29,9 +29,9 @@ def _engine():
 def ingest_rules() -> int:
     n = 0
     with _engine().begin() as conn:
-        for d in rules.rule_documents():
+        for d in rules.rule_documents() + rules.reference_documents():
             n += upsert_document(conn, **d)
-    log.info("rules: %d chunks", n)
+    log.info("rules and references: %d chunks", n)
     return n
 
 

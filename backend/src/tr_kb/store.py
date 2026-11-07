@@ -73,7 +73,8 @@ WITH kw AS (
 ), fused AS (
     SELECT id, sum(1.0 / (60 + r)) AS score FROM (SELECT id, r FROM kw UNION ALL SELECT id, r FROM vec) u GROUP BY id
 )
-SELECT c.id::text AS chunk_id, d.title, d.code, d.url, d.source, d.license, d.version, c.heading, c.body, f.score
+SELECT c.id::text AS chunk_id, d.title, d.code, d.url, d.source, d.license, d.version, c.heading, c.body, f.score,
+       coalesce((d.meta->>'link_only')::boolean, false) AS link_only, d.meta->>'work_license' AS work_license
 FROM fused f JOIN kb_chunks c ON c.id = f.id JOIN kb_documents d ON d.id = c.document_id
 ORDER BY f.score DESC LIMIT :limit
 """

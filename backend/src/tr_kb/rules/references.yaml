@@ -1,0 +1,243 @@
+# Further-reading catalog: outside courses, books, curricula and videos the assistant can point people to.
+# Descriptions are our own summaries. The works themselves are NOT stored or quoted: most are non-commercial
+# (CC BY-NC) or all rights reserved, so the app links out to them. `work_license` records the linked work's terms.
+# `stages` are app pipeline stages; `topics` use the PINA core-curriculum taxonomy (topics.yaml).
+# Source catalog: Permaculture App project, claude/permaculture-source-library.md (Nov 2026).
+version: "0.1"
+references:
+  - id: osu-intro-permaculture
+    title: "Introduction to Permaculture (Andrew Millison, Oregon State University, open textbook)"
+    kind: book
+    author: Andrew Millison
+    url: https://open.oregonstate.education/permaculture/
+    alt_urls:
+      - https://openlibrary-repo.ecampusontario.ca/jspui/handle/123456789/847
+    work_license: CC BY-NC 4.0
+    stages: [site_survey, concept_design, water_design]
+    topics: [ethics_principles, patterns, climates_microclimates, design_methods, water, broad_scale]
+    summary: >
+      Free online textbook built from OSU's introductory permaculture MOOC, with embedded teaching videos. Covers
+      permaculture ethics and scales of system; reading a site from the region down to microclimates, including
+      watershed patterns, restoring deforested watersheds, sectors and solar aspect; designing with zones,
+      sectors and the scale of permanence; and the major elements of a system (water, food, soil, trees,
+      shelter, energy, community). Its site-reading chapter lines up with the app's site survey, and its zones and
+      scale-of-permanence material gives the ordering logic for concept design.
+
+  - id: osu-design-climate-resilience
+    title: "Permaculture Design: Tools for Climate Resilience (Andrew Millison, Oregon State University, open textbook)"
+    kind: book
+    author: Andrew Millison
+    url: https://open.oregonstate.education/permaculturedesign/
+    alt_urls:
+      - https://openlibrary-repo.ecampusontario.ca/jspui/bitstream/123456789/853/3/Permaculture-Design-Tools-for-Climate-Resilience-1598301348.pdf
+    work_license: CC BY-NC 4.0
+    stages: [site_survey, hazard_overlays]
+    topics: [climates_microclimates, design_for_catastrophe, water, broad_scale]
+    summary: >
+      Free textbook organized around P.A. Yeomans' scale of landscape permanence (climate, landform, water and so
+      on down to soil), the same framework behind keyline design. Part 1 teaches climate assessment: climate
+      classification, projections, and the climate-analogue method of finding a place whose climate today
+      resembles a site's projected future climate. Part 2 gives design strategies for drought, heat and erratic
+      rainfall, wildfire, tropical cyclones, and sea level rise and flooding. Relevant to hazard overlays (fire,
+      flood, drought) and to a possible climate-analogue feature.
+
+  - id: osu-pdc-syllabus
+    title: "Oregon State University Permaculture Design Certificate: syllabus"
+    kind: course
+    author: Oregon State University PACE
+    url: https://workspace.oregonstate.edu/hubfs/Syllabus/PDC_Syllabus.pdf
+    alt_urls:
+      - https://pace.oregonstate.edu/catalog/permaculture-design-certificate-online
+    work_license: All rights reserved (paid course; public syllabus)
+    stages: [client_intake, site_survey, base_map, water_design, planting]
+    topics: [design_methods, water, soils, trees_forests, home_system]
+    summary: >
+      Ten-week online design certificate. Its assignment sequence is a practical template for a design workflow:
+      climate and personal survey; base map and client interview; site and regional challenges with a sector
+      compass; microclimates and current zones; a water survey with watershed map and site water-flow analysis;
+      soil map and tests; local ecology and an elevation view; plant system design; buildings and Zone 1; and
+      local networks with a final design. Required text is Practical Permaculture (Bloom and Boehnlein).
+
+  - id: osu-water-microlearning
+    title: "Water in Permaculture Design (OSU free 15-minute module)"
+    kind: course
+    author: Andrew Millison, Oregon State University
+    url: https://app.7taps.com/wRq9sB9Lfk
+    work_license: All rights reserved (free to view)
+    stages: [water_design]
+    topics: [water, earthworks]
+    summary: >
+      A short free module made of clips from Millison's classes on water in permaculture design. A quick
+      introduction to point a client or new designer to before a water-design conversation.
+
+  - id: osu-water-management-course
+    title: "Permaculture Water Management (OSU advanced certificate)"
+    kind: course
+    author: Oregon State University PACE
+    url: https://workspace.oregonstate.edu/certificate/permaculture-water-management
+    work_license: All rights reserved (paid course)
+    stages: [water_design]
+    topics: [water, earthworks, broad_scale]
+    summary: >
+      Paid advanced course on permaculture water systems, for designers who want deeper training in water
+      harvesting and earthworks beyond the introductory material.
+
+  - id: millison-best-worst-places-to-build
+    title: "5 Best (and Worst) Places to Build a Home or Village (Andrew Millison, video)"
+    kind: video
+    author: Andrew Millison
+    url: https://www.youtube.com/watch?v=0Trz6NvsUQQ
+    work_license: Standard YouTube license (link only)
+    stages: [concept_design]
+    topics: [patterns, climates_microclimates, built_environment, design_methods]
+    summary: >
+      Video on site selection for homes and settlements: where landform, water and microclimate make a place good
+      or poor to build. Useful background when placing a house, barn or road relative to slope, valleys and ridges.
+
+  - id: keyline-wolf-gulch
+    title: "Permaculture Keyline Water Systems at Wolf Gulch Farm (video)"
+    kind: video
+    author: Andrew Millison
+    url: https://thewaterchannel.tv/videos/permaculture-keyline-water-systems-wolf-gulch-farm/
+    work_license: All rights reserved (link only)
+    stages: [water_design]
+    topics: [water, earthworks, broad_scale]
+    summary: >
+      Field tour of a keyline water system on a working farm: keyline cultivation, ponds and the way water is
+      moved from valleys toward ridges. Good for showing a client what keyline looks like on the ground.
+
+  - id: keyline-seven-seeds
+    title: "Permaculture Keyline Water Systems at Seven Seeds Farm (video)"
+    kind: video
+    author: Andrew Millison
+    url: https://thewaterchannel.tv/videos/permaculture-keyline-water-systems-seven-seeds-farm/
+    work_license: All rights reserved (link only)
+    stages: [water_design]
+    topics: [water, earthworks, broad_scale]
+    summary: >
+      A second farm tour of keyline water systems, showing ponds, diversions and keyline cultivation in practice.
+
+  - id: millison-youtube
+    title: "Andrew Millison's YouTube channel"
+    kind: video
+    author: Andrew Millison
+    url: https://www.youtube.com/@amillison
+    work_license: Standard YouTube license (link only)
+    stages: [water_design, hazard_overlays]
+    topics: [water, broad_scale, design_for_catastrophe]
+    summary: >
+      Videos on large-scale water harvesting and landscape restoration around the world, including desert canal
+      forests, ancient Egyptian water systems, the Paani Foundation watershed program in India, and Sahel
+      restoration. Good inspiration and case studies for broad-acre water design.
+
+  - id: oaec-pdc
+    title: "Occidental Arts & Ecology Center Permaculture Design Course (Occidental, California)"
+    kind: course
+    author: Occidental Arts & Ecology Center (Brock Dolman, Kendall Dunnigan)
+    url: https://oaec.org/permaculture
+    work_license: All rights reserved (materials for enrolled participants only)
+    stages: [client_intake, site_survey, concept_design, water_design, hazard_overlays]
+    topics: [design_methods, water, earthworks, soils, trees_forests, invisible_structures]
+    summary: >
+      Nine-day residential design course in Sonoma County, adapted from the PINA core curriculum, with a
+      "public permaculture" and justice-and-ecology framing and a design practicum for a real community group.
+      Its design process runs in three phases: site assessment (map making, pre-site and on-site assessment),
+      visioning (client interview, a guiding "north star" vision, functions and elements), then design (zones,
+      bubble maps, access, water, food, shelter, community). Hands-on work includes swales, sheet mulching,
+      composting, food forests, wildland fuel reduction, brush berms and gully repair. A local reference for
+      Northern California sites.
+
+  - id: oaec-water-publications
+    title: "OAEC water publications: graywater, roof water harvesting, stormwater retention"
+    kind: book
+    author: Occidental Arts & Ecology Center
+    url: https://oaec.org/permaculture
+    work_license: All rights reserved
+    stages: [water_design]
+    topics: [water, home_system, waste_bioremediation]
+    summary: >
+      OAEC publications on legal small-scale graywater design in California, roof water harvesting for a
+      low-impact water supply, and an integrated stormwater retention system. Relevant to Zone 1 and home-system
+      water design in California.
+
+  - id: pina-core-curriculum
+    title: "Permaculture Institute of North America (PINA) PDC Core Curriculum"
+    kind: curriculum
+    author: Permaculture Institute of North America
+    url: https://pina.in/wp-content/uploads/2015/02/CoreCurriculum.pdf
+    alt_urls:
+      - https://pina.in/pdc/teacher-resources/
+    work_license: Not stated (contact programs@pina.in); link only
+    stages: [client_intake, site_survey, concept_design, water_design, planting]
+    topics: [design_methods]
+    summary: >
+      The shared outline for 72-hour permaculture design courses in North America: 26 topics from ethics and
+      principles through water, earthworks, soils, trees, animals, the built environment, broad-scale landscape
+      design, invisible structures and economics. The app uses its topic list as the taxonomy for tagging
+      knowledge-base content; water, earthworks and broad-scale landscape design are the core of the MVP.
+
+  - id: pina-post-pdc-guidebook
+    title: "PINA Post-PDC Guidebook"
+    kind: book
+    author: Permaculture Institute of North America
+    url: https://pina.in/wp-content/uploads/2024/02/Post-PDC-Guidebook.pdf
+    work_license: Not stated; link only
+    stages: []
+    topics: [permaculture_scene]
+    summary: >
+      Guidance for designers after a design certificate: pathways to practice, diplomas and continued learning.
+
+  - id: morrow-teaching-permaculture
+    title: "Earth User's Guide to Teaching Permaculture (Rosemary Morrow)"
+    kind: book
+    author: Rosemary Morrow
+    url: https://pina.in/pdc/teacher-resources/
+    work_license: Released publicly by the author; terms not stated; link only
+    stages: []
+    topics: [design_methods, ethics_principles]
+    summary: >
+      Rosemary Morrow's guide to teaching permaculture design courses, listed among PINA's teacher resources.
+
+  - id: lancaster-rainwater-v1
+    title: "Rainwater Harvesting for Drylands and Beyond, Vol. 1 (Brad Lancaster)"
+    kind: book
+    author: Brad Lancaster
+    work_license: All rights reserved (book)
+    stages: [water_design]
+    topics: [water, earthworks]
+    summary: >
+      Standard practical reference on harvesting rainwater in the landscape: principles for reading water flow
+      and sizing and placing passive earthworks and tanks. Recommended reading in the OSU and OAEC water units.
+
+  - id: bloom-boehnlein-practical-permaculture
+    title: "Practical Permaculture (Jessi Bloom and Dave Boehnlein)"
+    kind: book
+    author: Jessi Bloom, Dave Boehnlein
+    work_license: All rights reserved (book)
+    stages: [site_survey, concept_design, planting]
+    topics: [design_methods, home_system, trees_forests]
+    summary: >
+      Illustrated design handbook for homes, farms and communities (Timber Press, 2015); the required text for
+      OSU's design certificate.
+
+  - id: aranya-step-by-step
+    title: "Permaculture Design: A Step-by-Step Guide (Aranya)"
+    kind: book
+    author: Aranya
+    work_license: All rights reserved (book)
+    stages: [client_intake, site_survey, concept_design]
+    topics: [design_methods]
+    summary: >
+      A walk through the permaculture design process from survey and client interview to a finished design;
+      recommended reading for OAEC's course.
+
+  - id: jeavons-grow-more-vegetables
+    title: "How to Grow More Vegetables (John Jeavons)"
+    kind: book
+    author: John Jeavons
+    work_license: All rights reserved (book)
+    stages: [planting]
+    topics: [soils, home_system]
+    summary: >
+      Classic guide to biointensive vegetable growing on small areas; recommended reading for OAEC's course and
+      relevant to Zone 1 garden design.

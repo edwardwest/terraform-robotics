@@ -137,7 +137,7 @@ All return a file download: `GET /api/projects/{id}/export/geojson`, `/export/sh
 
 ## Knowledge base
 
-`GET /api/knowledge/search?q=&source=nrcs_cps|rules&limit=6` → passages `[{chunk_id, title, code, url, source, license, heading, body, score}]`. Hybrid ranking: full-text (any word) plus pgvector similarity (Vertex `text-embedding-005`), fused by reciprocal rank. Only commercially usable sources are stored (NRCS standards and USDA PLANTS are US government works; design rules are in-house).
+`GET /api/knowledge/search?q=&source=nrcs_cps|rules|references&limit=6` → passages `[{chunk_id, title, code, url, source, license, heading, body, score, link_only, work_license}]`. `references` is a further-reading catalog (OSU open textbooks, OAEC, PINA, Millison videos, standard books): our own descriptions, stored link-only because the works are non-commercial or all rights reserved; `work_license` gives the linked work's terms. Content is tagged with the PINA core-curriculum topics (`tr_kb/rules/topics.yaml`) in `meta.topics`. Hybrid ranking: full-text (any word) plus pgvector similarity (Vertex `text-embedding-005`), fused by reciprocal rank. Embeddings live in pgvector in Cloud SQL with an HNSW cosine index (`sql/005_kb_vector_index.sql`). Only commercially usable sources are stored (NRCS standards and USDA PLANTS are US government works; design rules are in-house).
 
 `GET /api/knowledge/rules` → the design rules library (id, title, status, applies_to, parameters, sources, body).
 

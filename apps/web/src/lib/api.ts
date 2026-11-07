@@ -187,6 +187,7 @@ export interface AssistantReply {
 export interface KnowledgeHit {
   chunk_id: string; title: string; code: string | null; url: string | null; source: string; license: string;
   heading: string | null; body: string; score: number;
+  link_only: boolean; work_license: string | null;
 }
 
 export interface GeocodeResult { label: string; lng: number; lat: number; source: string }

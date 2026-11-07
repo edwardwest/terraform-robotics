@@ -37,7 +37,7 @@ You help a designer read their site and lay out keyline patterns and swales.
 
 How you work:
 - Never invent coordinates, lengths, volumes, grades or costs. Every number you state comes from a tool result.
-- Start from get_site_summary. Use search_knowledge for practice criteria and design rules, and cite them by title (and NRCS code) when you rely on them.
+- Start from get_site_summary. Use search_knowledge for practice criteria and design rules, and cite them by title (and NRCS code) when you rely on them. Results marked link_only are our short descriptions of outside courses, books and videos (for example Oregon State University's open textbooks, OAEC's course, Andrew Millison's videos); suggest them as further reading with their link, and do not present them as quoted text or as design criteria.
 - To design, call propose_keyline_pattern or propose_swale. Each call computes real geometry from the terrain model and saves a draft the person sees on the map. Offer two or three options when the choice is genuinely open (for example parallel versus graded patterns, or different keypoints), then compare them on the numbers the tools return.
 - Proposals are drafts. Say that the person can preview, accept or discard them in the panel. Do not claim anything has been built or saved to the design until they accept.
 - Look at data quality. If the terrain is planning grade, say plainly that lines may be a metre or more off in the field and a drone LiDAR or RTK survey is needed for design grade. If it is coarse, do not propose keylines.
@@ -69,9 +69,9 @@ TOOLS: list[dict[str, Any]] = [
      "description": "The current cost estimate for the saved design (not drafts): line items, totals as low–high ranges, quantities.",
      "input_schema": {"type": "object", "properties": {}}},
     {"name": "search_knowledge",
-     "description": "Search NRCS conservation practice standards and the Terraform Robotics design rules. Returns passages with title, code and link.",
+     "description": "Search NRCS conservation practice standards, the Terraform Robotics design rules, and a further-reading catalog of permaculture courses, books and videos (link-only). Returns passages with title, code and link.",
      "input_schema": {"type": "object", "required": ["query"], "properties": {
-         "query": {"type": "string"}, "source": {"type": "string", "enum": ["nrcs_cps", "rules"]}}}},
+         "query": {"type": "string"}, "source": {"type": "string", "enum": ["nrcs_cps", "rules", "references"]}}}},
     {"name": "find_species",
      "description": "Find plant species from USDA PLANTS by name and traits (growth habit, nitrogen fixing, drought tolerance, cold hardiness).",
      "input_schema": {"type": "object", "properties": {
@@ -231,7 +231,8 @@ def run_tool(name: str, args: dict, project_id: UUID, project: dict, user: dict,
             with get_engine().connect() as conn:
                 hits = kb.search(conn, str(args.get("query", ""))[:300], limit=5, source=args.get("source"))
             return {"results": [{"title": h["title"], "code": h["code"], "heading": h["heading"], "url": h["url"],
-                                 "license": h["license"], "text": h["body"][:1200]} for h in hits]}
+                                 "license": h["license"], "link_only": h.get("link_only", False), "work_license": h.get("work_license"),
+                                 "text": h["body"][:1200]} for h in hits]}
         if name == "find_species":
             with get_engine().connect() as conn:
                 rows = kb.find_species(conn, args.get("query"), growth_habit=args.get("growth_habit"),

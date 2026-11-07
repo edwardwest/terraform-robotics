@@ -1,0 +1,29 @@
+# Knowledge-base topic taxonomy, after the Permaculture Institute of North America (PINA) PDC core curriculum.
+# Used to tag references, design rules and practice standards. MVP core: water, earthworks, broad_scale.
+topics:
+  intro: Introduction to permaculture
+  ethics_principles: Ethics and principles
+  local_ecosystem: Local ecosystem
+  patterns: Patterns
+  climates_microclimates: Climates and microclimates
+  design_methods: Design methods and process
+  home_system: Home system
+  water: Water
+  earthworks: Earthworks
+  soils: Soils
+  trees_forests: Trees, forests and cultivated ecologies
+  animals: Animals
+  aquaculture: Aquaculture
+  built_environment: Built environment
+  waste_bioremediation: Waste and bioremediation
+  appropriate_technology: Appropriate technology
+  design_for_catastrophe: Design for catastrophe
+  urban: Urban permaculture
+  broad_scale: Broad-scale landscape design
+  invisible_structures: Invisible structures
+  economics: Economic systems
+  access_to_land: Access to land
+  ecovillages: Ecovillage design
+  permaculture_scene: The permaculture scene
+  design_projects: Design projects
+  talent_show: Talent show

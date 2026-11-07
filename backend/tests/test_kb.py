@@ -246,3 +246,28 @@ def test_trait_value_yes_no_and_flags():
     assert plants.trait_value("fire_resistance", T + "fireResistantYes") == "Yes"
     assert plants.trait_value("horticulture", T + "fruitSeedConspicuousYes") == "Fruit seed conspicuous"
     assert plants.trait_value("horticulture", T + "coppicePotentialNo") is None
+
+
+def test_references_are_link_only_and_use_known_topics():
+    topics = rules.load_topics()
+    assert len(topics) == 26
+    docs = rules.reference_documents()
+    assert len(docs) >= 15
+    for d in docs:
+        assert d["meta"]["link_only"] is True and d["meta"]["work_license"]
+        assert set(d["meta"]["topics"]) <= set(topics), d["title"]
+        assert d["url"] is None or d["url"].startswith("https://")
+    for d in rules.rule_documents():
+        assert set(d["meta"]["topics"]) <= set(topics)
+
+
+def test_reference_search_flags_link_only(client):
+    from tr_api.db import get_engine
+    from tr_kb.store import search, upsert_document
+
+    with get_engine().begin() as conn:
+        for d in rules.reference_documents():
+            upsert_document(conn, **d)
+        hits = search(conn, "climate analogue wildfire flooding resilience", source="references")
+    assert hits and hits[0]["link_only"] is True
+    assert "Climate Resilience" in hits[0]["title"]
