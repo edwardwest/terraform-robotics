@@ -309,8 +309,17 @@ export function TerrainMap({
     };
   }, [map, pitched]);
 
+  // Back to the starting 3D camera: the whole property in frame (undoing zoom and pan) at the default tilt and heading.
   const resetView = () => {
-    map?.easeTo({ pitch: 60, bearing: -20, duration: 600 });
+    if (!map) return;
+    const view = { pitch: 60, bearing: -20 };
+    let frame;
+    if (project) {
+      const [a, b, c, d] = project.bbox;
+      frame = map.cameraForBounds([a, b, c, d], { padding: 48, maxZoom: 18, ...view });
+    }
+    map.stop();
+    map.easeTo({ ...frame, ...view, duration: 700 });
   };
 
   const toggle3d = () => {
