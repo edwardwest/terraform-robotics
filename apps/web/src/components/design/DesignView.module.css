@@ -142,3 +142,51 @@
   pointer-events: none;
   opacity: 0.45;
 }
+
+/* Your plan (chosen interventions in build order) */
+.plan {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.planHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.planList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.planPhase {
+  display: block;
+  margin-top: var(--space-1);
+}
+
+.planRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.planText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.planTitle {
+  color: var(--fg-1);
+  font-weight: 700;
+  font-size: 15px;
+}

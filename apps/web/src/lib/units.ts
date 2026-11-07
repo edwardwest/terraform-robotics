@@ -9,6 +9,14 @@ export const ftToM = (ft: number): number => ft / FT_PER_M;
 export const m2ToAcres = (m2: number): number => m2 / M2_PER_ACRE;
 export const acresToM2 = (acres: number): number => acres * M2_PER_ACRE;
 export const mToMiles = (m: number): number => m / M_PER_MILE;
+export const m2ToFt2 = (m2: number): number => m2 * FT_PER_M * FT_PER_M;
+export const ft2ToM2 = (ft2: number): number => ft2 / (FT_PER_M * FT_PER_M);
+export const GAL_PER_M3 = 264.172052;
+export const m3ToGal = (m3: number): number => m3 * GAL_PER_M3;
+export const galToM3 = (gal: number): number => gal / GAL_PER_M3;
+export const MM_PER_IN = 25.4;
+export const mmToIn = (mm: number): number => mm / MM_PER_IN;
+export const inToMm = (inches: number): number => inches * MM_PER_IN;
 
 const fmt = (n: number, digits: number): string =>
   n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });

@@ -1,4 +1,5 @@
 "use client";
+import { stepCount } from "@/lib/steps";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -150,7 +151,7 @@ export function SiteSetup({ projectId }: { projectId: string | null }) {
       } else if (JSON.stringify(boundary) !== loadedBoundary.current) {
         await api.updateBoundary(id, boundary, apiSource);
       }
-      router.push(`/projects/${id}/survey`);
+      router.push(`/projects/${id}/goals`);
     } catch (err) {
       setError((err as Error).message);
       setSaving(false);
@@ -161,11 +162,11 @@ export function SiteSetup({ projectId }: { projectId: string | null }) {
     <div className={styles.layout}>
       <form className={styles.left} onSubmit={submit} aria-busy={loading || saving}>
         <div className={styles.intro}>
-          <p className="app-eyebrow">{projectId ? "Project" : "New project"} · Step 1 of 5</p>
+          <p className="app-eyebrow">{projectId ? "Project" : "New project"} · {stepCount("site")}</p>
           <h1 className="app-display">Start with the land.</h1>
           <p className="app-body">
-            Name the property and set its boundary. Everything that follows, from contours to keylines, is measured
-            inside this line.
+            Name the property and set its boundary. Everything that follows, from goals and contours to the plan and
+            its cost, is measured inside this line.
           </p>
         </div>
 
@@ -323,7 +324,7 @@ export function SiteSetup({ projectId }: { projectId: string | null }) {
 
         <div className={styles.actions}>
           <button type="submit" className="btn btn-primary" disabled={!canContinue}>
-            {saving ? "Saving." : "Continue to survey"} <IconArrowRight />
+            {saving ? "Saving." : "Continue to goals"} <IconArrowRight />
           </button>
           {!boundary && <span className="app-small">Set a boundary to continue.</span>}
           {boundary && !name.trim() && <span className="app-small">Name the property to continue.</span>}

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  mToFt, ftToM, m2ToAcres, acresToM2, mToMiles,
+  mToFt, ftToM, m2ToAcres, acresToM2, mToMiles, m2ToFt2, ft2ToM2, m3ToGal, galToM3, mmToIn, inToMm,
   formatAcres, formatFeet, formatMiles, formatPct, formatResolution, niceStep, ticks,
 } from "./units.ts";
 
@@ -37,4 +37,13 @@ test("axis ticks", () => {
   assert.equal(niceStep(7, 5), 1);
   assert.deepEqual(ticks(0, 100, 5), [0, 20, 40, 60, 80, 100]);
   assert.deepEqual(ticks(138, 389, 5), [150, 200, 250, 300, 350]);
+});
+
+test("area, volume and rainfall conversions", () => {
+  close(m2ToFt2(1), 10.7639104, 1e-6);
+  close(ft2ToM2(m2ToFt2(42)), 42);
+  close(m3ToGal(1), 264.172052);
+  close(galToM3(5000), 18.92705892, 1e-6);
+  close(mmToIn(25.4), 1);
+  close(inToMm(30), 762);
 });

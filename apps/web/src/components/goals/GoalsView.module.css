@@ -1,0 +1,150 @@
+.layout {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--gutter) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 760px;
+  margin-bottom: var(--space-2);
+}
+
+.head :global(.app-display) {
+  font-size: 40px;
+}
+
+.headActions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.section {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.goalGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2);
+}
+
+.goal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--touch);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  color: var(--fg-1);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--fade), background-color var(--fade);
+}
+
+.goal:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+.goal:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.goalOn {
+  border-color: var(--border-strong);
+  background: var(--ink-400);
+}
+
+.goalTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.goalLabel {
+  font-weight: 700;
+}
+
+.rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--white);
+  color: var(--ink-0);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.narrow {
+  max-width: 220px;
+}
+
+.vision {
+  resize: vertical;
+  min-height: 88px;
+  padding-top: 10px;
+  font: inherit;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.summary {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .head :global(.app-display) {
+    font-size: 30px;
+  }
+
+  .section {
+    padding: var(--space-3);
+  }
+
+  .spacer {
+    display: none;
+  }
+}

@@ -2,22 +2,29 @@
 // The assistant on every project step: a header button, a side panel, and at most one nudge at a time.
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { api, type AssistantStep, type ChatMessage, type Proposal } from "@/lib/api";
-import { useAssistant } from "@/lib/assistant";
+import { api, type AssistantStep, type BriefUpdate, type ChatMessage, type Proposal } from "@/lib/api";
+import { INTERVIEW_PROMPT, useAssistant } from "@/lib/assistant";
+import { describeBrief, useCatalog } from "@/lib/catalog";
+import { STEPS, announceChange } from "@/lib/steps";
 import { formatFeet, m2ToAcres } from "@/lib/units";
 import { IconAlert, IconArrowRight, IconCheck, IconX } from "../Icons";
 import styles from "./AssistantDock.module.css";
 
-const STEP_LABEL: Record<AssistantStep, string> = {
-  site: "Site", survey: "Survey", terrain: "Terrain", design: "Design", estimate: "Estimate",
-};
+const STEP_LABEL = Object.fromEntries(STEPS.map((s) => [s.seg, s.label])) as Record<AssistantStep, string>;
+
 
 const STARTERS: Record<AssistantStep, string[]> = {
   site: ["What makes a good site boundary?", "What will this app produce for my land?"],
-  survey: ["Is my data good enough for keyline design?", "What does DEM resolution mean?", "What should I do next?"],
+  goals: [INTERVIEW_PROMPT, "How do my goals change what you'd suggest?", "What's permaculture's scale of permanence?"],
+  survey: ["Do I need elevation data for my goals?", "What does DEM resolution mean?", "What should I do next?"],
   terrain: ["What do these keypoints mean?", "Which keypoints should I confirm?", "Where does water leave my site?"],
+  ideas: [
+    "Which of these should I do first, and why?",
+    "What would you do with a small budget?",
+    "Is keyline worth it on this site?",
+  ],
   design: [
-    "What should I know about this site before laying keylines?",
+    "In what order should I build my plan?",
     "Propose two keyline options for the main valley.",
     "Where would a swale help most, and how much would it hold?",
   ],
@@ -26,10 +33,13 @@ const STARTERS: Record<AssistantStep, string[]> = {
 
 const INTRO: Record<AssistantStep, string> = {
   site: "Ask about boundaries, the steps ahead, or what the app can do.",
+  goals:
+    "Talk through what you want from the land. Suggested answers appear here with an Apply button; nothing changes until you apply them.",
   survey: "Ask about elevation data, data quality, or building the terrain model.",
   terrain: "Ask what the map and numbers mean, or which keypoints to trust.",
+  ideas: "Ask which ideas fit your goals, what to do first, or how any of them works.",
   design:
-    "Ask about the site, the rules, or plants, or ask for layout options. Every line it proposes is computed from the terrain model and stays a draft until you accept it.",
+    "Ask about your plan, the rules, or plants, or ask for keyline and swale options. Every line it proposes is computed from the terrain model and stays a draft until you accept it.",
   estimate: "Ask what drives the cost, what's included, or how to adjust unit costs.",
 };
 
@@ -56,8 +66,22 @@ function nudgeFor(step: AssistantStep | null, ctx: Record<string, unknown>): Nud
   if (step === "estimate" && n("line_item_count") === 0) {
     return {
       key: "estimate-empty",
-      text: "Nothing to estimate yet. Want help deciding what to lay out first?",
-      prompt: "There's nothing in the estimate yet. What should I lay out first?",
+      text: "Nothing to estimate yet. Want help deciding what to plan first?",
+      prompt: "There's nothing in the estimate yet. What should I plan or lay out first?",
+    };
+  }
+  if (step === "goals" && n("goal_count") === 0) {
+    return {
+      key: "goals-empty",
+      text: "Not sure where to start? I can ask a few questions and fill in the goals with you.",
+      prompt: INTERVIEW_PROMPT,
+    };
+  }
+  if (step === "ideas" && ctx.brief_complete === false) {
+    return {
+      key: "ideas-no-goals",
+      text: "These aren't ranked yet because no goals are set. Want to talk through your goals?",
+      prompt: INTERVIEW_PROMPT,
     };
   }
   return null;
@@ -129,6 +153,41 @@ function ProposalCard({ p, previewing, onPreview, onAccept, onDiscard, busy, can
   );
 }
 
+function BriefSuggestionCard({ suggestion, applied, busy, onApply, onDiscard }: {
+  suggestion: BriefUpdate;
+  applied: "applied" | "discarded" | null;
+  busy: boolean;
+  onApply: () => void;
+  onDiscard: () => void;
+}) {
+  const { catalog } = useCatalog();
+  const rows = describeBrief(catalog, suggestion);
+  return (
+    <div className={styles.proposal}>
+      <div className={styles.propHead}>
+        <span className={styles.propTitle}>Suggested goals · not saved</span>
+      </div>
+      <dl className={styles.facts}>
+        {rows.map(([k, v]) => (
+          <div key={k}><dt className="app-small">{k}</dt><dd>{v}</dd></div>
+        ))}
+      </dl>
+      {applied ? (
+        <p className="app-small">{applied === "applied" ? "Applied to your goals." : "Not applied."}</p>
+      ) : (
+        <div className={styles.propActions}>
+          <button type="button" className="btn btn-sm btn-primary" onClick={onApply} disabled={busy}>
+            <IconCheck size={14} /> Apply to goals
+          </button>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={onDiscard} disabled={busy}>
+            <IconX size={14} /> Not now
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The header button. Shows a dot while a nudge is waiting. */
 export function AssistantButton() {
   const { projectId, step, open, setOpen, pageContext, dismissedNudges } = useAssistant();
@@ -152,8 +211,9 @@ export function AssistantButton() {
 export function AssistantDock() {
   const {
     projectId, step, pageContext, design, open, setOpen, turns, setTurns, proposals, setProposals,
-    dismissedNudges: dismissed, dismissNudge: dismiss,
+    dismissedNudges: dismissed, dismissNudge: dismiss, queued, clearQueued,
   } = useAssistant();
+  const [briefState, setBriefState] = useState<Record<number, "applied" | "discarded">>({});
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,6 +239,14 @@ export function AssistantDock() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, setOpen]);
+
+  // A page button asked for a prompt (for example "Talk it through with the assistant").
+  const sendRef = useRef<(text: string) => void>(() => {});
+  useEffect(() => {
+    if (!queued || thinking || !projectId) return;
+    clearQueued();
+    sendRef.current(queued);
+  }, [queued, thinking, projectId, clearQueued]);
 
   if (!projectId || !step) return null;
 
@@ -212,6 +280,22 @@ export function AssistantDock() {
       setThinking(false);
     }
   };
+
+  const applyBrief = async (turnIndex: number, suggestion: BriefUpdate) => {
+    setBusy(`brief-${turnIndex}`);
+    setError(null);
+    try {
+      await api.saveBrief(projectId, suggestion);
+      setBriefState((m) => ({ ...m, [turnIndex]: "applied" }));
+      announceChange("brief");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  sendRef.current = send;
 
   const takeNudge = (n: Nudge) => {
     dismiss(n.key);
@@ -262,6 +346,7 @@ export function AssistantDock() {
 
   const clear = () => {
     setTurns([]);
+    setBriefState({});
     setProposals({});
     setPreviewId(null);
     design?.onPreview(null);
@@ -316,6 +401,11 @@ export function AssistantDock() {
                   canAct={!!design} projectId={projectId}
                   onPreview={() => togglePreview(proposals[p.id] ?? p)} onAccept={() => accept(p)} onDiscard={() => discard(p)} />
               ))}
+              {t.reply?.brief_suggestion && (
+                <BriefSuggestionCard suggestion={t.reply.brief_suggestion} applied={briefState[i] ?? null}
+                  busy={busy === `brief-${i}`} onApply={() => applyBrief(i, t.reply!.brief_suggestion!)}
+                  onDiscard={() => setBriefState((m) => ({ ...m, [i]: "discarded" }))} />
+              )}
               {t.reply && t.reply.citations.length > 0 && (
                 <ul className={styles.cites} aria-label="Sources">
                   {t.reply.citations.map((c) => (

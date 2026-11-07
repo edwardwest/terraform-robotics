@@ -1,4 +1,4 @@
-# Step 2: Survey ("Bring the best ground data you have.")
+# Step 3: Survey ("Bring the best ground data you have.")
 
 **What it's for:** collecting elevation data and building the terrain model the rest of the app works from.
 

@@ -122,6 +122,27 @@ def _boundary_shape(project: dict) -> Polygon:
     return shape(project["boundary"])
 
 
+def plan_allowance_lines(project_id: UUID, costs: dict[str, dict]) -> list[dict]:
+    """Planning allowances for chosen interventions that the design tools don't compute (plan quantity × rate)."""
+    from tr_kb import interventions as iv
+
+    from .plan_api import plan_rows
+
+    lines = []
+    for p in plan_rows(project_id):
+        c = costs.get(p["cost_item"] or "")
+        if not c or not p["quantity"] or p["tool"]:
+            continue
+        qty = iv.quantity_in_cost_unit(p["quantity_basis"], float(p["quantity"]), c["unit"])
+        if qty <= 0:
+            continue
+        lines.append({"item": p["cost_item"], "label": p["title"], "quantity": round(qty, 2), "unit": c["unit"],
+                      "rate_low": c["rate_low"], "rate_high": c["rate_high"],
+                      "total_low": round(qty * c["rate_low"], 2), "total_high": round(qty * c["rate_high"], 2),
+                      "basis": "Planning allowance from your plan", "group": "plan"})
+    return lines
+
+
 def build_estimate(project_id: UUID, user: dict, contingency_pct: float) -> dict:
     project = _project_or_404(project_id, user)
     q, rows, draft = quantities(project_id, project)
@@ -133,7 +154,8 @@ def build_estimate(project_id: UUID, user: dict, contingency_pct: float) -> dict
         c = costs[item]
         return {"item": item, "label": c["label"], "quantity": round(qty, 2), "unit": c["unit"],
                 "rate_low": c["rate_low"], "rate_high": c["rate_high"],
-                "total_low": round(qty * c["rate_low"], 2), "total_high": round(qty * c["rate_high"], 2), "basis": basis}
+                "total_low": round(qty * c["rate_low"], 2), "total_high": round(qty * c["rate_high"], 2), "basis": basis,
+                "group": "design"}
 
     machines = (1 if q["treated_acres"] > 0 else 0) + (1 if q["swales"] > 0 else 0)
     lines = [
@@ -143,12 +165,13 @@ def build_estimate(project_id: UUID, user: dict, contingency_pct: float) -> dict
         line("berm_ft", q["berm_length_ft"], "Berm on the downhill side of each swale"),
         line("mobilization", machines, "Tractor for ripping, excavator for swales"),
     ]
-    lines = [ln for ln in lines if ln]
+    lines = [ln for ln in lines if ln] + plan_allowance_lines(project_id, costs)
     build_low = sum(ln["total_low"] for ln in lines)
     build_high = sum(ln["total_high"] for ln in lines)
     design = costs.get("design_acre")
-    fee_low = round(q["site_acres"] * design["rate_low"], 2) if design and lines else 0.0
-    fee_high = round(q["site_acres"] * design["rate_high"], 2) if design and lines else 0.0
+    designed = any(ln["group"] == "design" for ln in lines)  # the per-acre design fee covers computed layouts only
+    fee_low = round(q["site_acres"] * design["rate_low"], 2) if design and designed else 0.0
+    fee_high = round(q["site_acres"] * design["rate_high"], 2) if design and designed else 0.0
     cont_low = round(build_low * contingency_pct / 100, 2)
     cont_high = round(build_high * contingency_pct / 100, 2)
     return {
@@ -159,8 +182,8 @@ def build_estimate(project_id: UUID, user: dict, contingency_pct: float) -> dict
         "total_low": round(build_low + fee_low + cont_low, 2), "total_high": round(build_high + fee_high + cont_high, 2),
         "quantities": q,
         "draft": draft,
-        "note": "Estimates: design geometry × an editable unit-cost library. Starter rates are placeholders; "
-                "confirm with a local contractor before committing.",
+        "note": "Estimates: design geometry and your plan's quantities × an editable unit-cost library. Starter rates "
+                "and planning allowances are placeholders; confirm with a local contractor before committing.",
     }
 
 

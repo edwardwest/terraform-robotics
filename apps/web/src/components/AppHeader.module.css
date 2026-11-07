@@ -27,6 +27,13 @@
 .nav {
   margin-left: auto;
   min-width: 0;
+  /* Seven steps can be wider than a phone: the step row scrolls instead of widening the page. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
 }
 
 .steps {
@@ -80,8 +87,8 @@ a.step:hover {
   color: var(--fg-faint);
 }
 
-/* With the Assistant button in the header, step labels collapse to numbers (except the current step) sooner. */
-@media (max-width: 1000px) {
+/* Seven steps plus the Assistant button: labels collapse to numbers (except the current step) below this width. */
+@media (max-width: 1240px) {
   .step {
     padding: 0 10px;
   }
@@ -101,7 +108,7 @@ a.step:hover {
     height: 18px;
   }
   .step {
-    padding: 0 10px;
+    padding: 0 8px;
   }
   .label {
     display: none;

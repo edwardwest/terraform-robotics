@@ -198,6 +198,7 @@ class EstimateLine(BaseModel):
     total_low: float
     total_high: float
     basis: str
+    group: Literal["design", "plan"] = "design"  # computed from design geometry, or a planning allowance
 
 
 class Estimate(BaseModel):
@@ -237,6 +238,9 @@ class Parcel(BaseModel):
 # ---- AI assistant ---------------------------------------------------------------------------------
 
 
+AssistantStep = Literal["site", "goals", "survey", "terrain", "ideas", "design", "estimate"]
+
+
 class AssistantMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=8000)
@@ -245,7 +249,7 @@ class AssistantMessage(BaseModel):
 class AssistantRequest(BaseModel):
     messages: list[AssistantMessage] = Field(min_length=1, max_length=40)
     allow_planning: bool = False
-    step: Literal["site", "survey", "terrain", "design", "estimate"] = "design"
+    step: AssistantStep = "design"
     page_context: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("page_context")
@@ -279,3 +283,110 @@ class AssistantReply(BaseModel):
     tool_log: list[dict[str, Any]]
     proposals: list[Proposal]
     citations: list[dict[str, Any]]
+    brief_suggestion: dict[str, Any] | None = None  # partial goals brief the person can apply on the Goals step
+
+
+# ---- Goals brief, intervention ideas and the plan ---------------------------------------------------
+
+
+def _check_options(question: str, values: list[str] | str | None):
+    from tr_kb import interventions as iv
+
+    if values is None:
+        return values
+    allowed = iv.option_ids(question) if question != "goals" else set(iv.goal_ids())
+    bad = [v for v in ([values] if isinstance(values, str) else values) if v not in allowed]
+    if bad:
+        raise ValueError(f"Unknown {question}: {', '.join(bad)}")
+    return values
+
+
+class BriefUpdate(BaseModel):
+    """What the person wants from the land. Every field is optional; goals are ranked, most important first."""
+
+    goals: list[str] | None = Field(default=None, max_length=5)
+    setting: str | None = None
+    has_buildings: bool | None = None
+    water_sources: list[str] | None = Field(default=None, max_length=5)
+    annual_rainfall_mm: float | None = Field(default=None, ge=0, le=6000)
+    budget: str | None = None
+    timeline: str | None = None
+    maintenance: str | None = None
+    constraints: list[str] | None = Field(default=None, max_length=5)
+    vision: str | None = Field(default=None, max_length=1500)
+
+    @field_validator("goals", "water_sources", "constraints")
+    @classmethod
+    def unique(cls, v):
+        if v is not None and len(set(v)) != len(v):
+            raise ValueError("List items must be unique")
+        return v
+
+    @field_validator("goals")
+    @classmethod
+    def known_goals(cls, v):
+        return _check_options("goals", v)
+
+    @field_validator("setting", "budget", "timeline", "maintenance", "water_sources", "constraints")
+    @classmethod
+    def known_options(cls, v, info):
+        return _check_options(info.field_name, v)
+
+
+class Brief(BriefUpdate):
+    updated_at: datetime | None = None
+
+
+class ReferenceLink(BaseModel):
+    id: str
+    title: str
+    url: str | None
+    work_license: str
+
+
+class Recommendation(BaseModel):
+    id: str
+    title: str
+    category: str
+    phase: str
+    summary: str
+    fit: Literal["good", "possible", "not_suited"]
+    score: float
+    matched_goals: list[str]
+    reasons: list[str]
+    concerns: list[str]
+    unknowns: list[str]
+    cautions: list[str]
+    maintenance: Literal["low", "medium", "high"]
+    cost_tier: int
+    nrcs: list[str]
+    rules: list[str]
+    references: list[ReferenceLink]
+    tool: Literal["keyline", "swale"] | None
+    quantity: dict[str, Any] | None
+    has_allowance: bool
+    selected: bool
+
+
+class Recommendations(BaseModel):
+    brief_complete: bool
+    site: dict[str, Any]
+    items: list[Recommendation]
+
+
+class PlanItemUpdate(BaseModel):
+    quantity: float | None = Field(default=None, ge=0, le=1e9)
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class PlanItem(BaseModel):
+    intervention_id: str
+    title: str
+    category: str
+    phase: str
+    tool: Literal["keyline", "swale"] | None
+    quantity_basis: Literal["area_m2", "length_m", "volume_m3", "count"] | None
+    quantity: float | None
+    notes: str | None
+    cost_item: str | None
+    created_at: datetime

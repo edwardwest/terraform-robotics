@@ -1,4 +1,4 @@
-// Typed client for the Stage 1 API (docs/api.md). Same-origin /api, proxied by next.config rewrites.
+// Typed client for the API (docs/api.md). Same-origin /api, proxied by next.config rewrites.
 import type { Feature, FeatureCollection, LineString, Point, Polygon } from "geojson";
 
 export type BoundarySource = "parcel" | "upload" | "drawn";
@@ -146,6 +146,8 @@ export interface EstimateLine {
   total_low: number;
   total_high: number;
   basis: string;
+  /** "design": computed from the design geometry; "plan": a planning allowance from the plan. */
+  group: "design" | "plan";
 }
 
 export interface Estimate {
@@ -167,7 +169,7 @@ export interface Estimate {
 export interface ChatMessage { role: "user" | "assistant"; content: string }
 
 /** The project step the assistant is answering from; it decides the assistant's tools and guide page. */
-export type AssistantStep = "site" | "survey" | "terrain" | "design" | "estimate";
+export type AssistantStep = "site" | "goals" | "survey" | "terrain" | "ideas" | "design" | "estimate";
 
 export interface Proposal {
   id: string;
@@ -185,6 +187,91 @@ export interface AssistantReply {
   tool_log: { tool: string; input: Record<string, unknown>; error?: string | null }[];
   proposals: Proposal[];
   citations: { title: string; url: string | null; code: string | null }[];
+  /** Partial goals brief suggested by the assistant; nothing is saved until the person applies it. */
+  brief_suggestion: BriefUpdate | null;
+}
+
+// ---- Goals brief, ideas and plan ----------------------------------------------------------------
+
+export interface Option { id: string; label: string }
+export interface GoalDef extends Option { hint: string }
+export type QuestionKey = "setting" | "budget" | "timeline" | "maintenance" | "water_sources" | "constraints";
+export type QuantityBasis = "area_m2" | "length_m" | "volume_m3" | "count";
+export type InterventionCategory = "water" | "earthworks" | "soil" | "plants" | "fire" | "animals" | "structures";
+
+export interface Catalog {
+  version: string;
+  goals: GoalDef[];
+  phases: Option[];
+  categories: (Option & { id: InterventionCategory })[];
+  questions: Record<QuestionKey, Option[]>;
+  interventions: {
+    id: string; title: string; category: InterventionCategory; phase: string; summary: string;
+    maintenance: "low" | "medium" | "high"; cost_tier: number; tool: "keyline" | "swale" | null;
+    quantity: { basis: QuantityBasis; default: number } | null; nrcs: string[];
+  }[];
+}
+
+export interface BriefUpdate {
+  goals?: string[] | null;
+  setting?: string | null;
+  has_buildings?: boolean | null;
+  water_sources?: string[] | null;
+  annual_rainfall_mm?: number | null;
+  budget?: string | null;
+  timeline?: string | null;
+  maintenance?: string | null;
+  constraints?: string[] | null;
+  vision?: string | null;
+}
+
+export interface Brief extends BriefUpdate { updated_at: string | null }
+
+export type Fit = "good" | "possible" | "not_suited";
+
+export interface Recommendation {
+  id: string;
+  title: string;
+  category: InterventionCategory;
+  phase: string;
+  summary: string;
+  fit: Fit;
+  score: number;
+  matched_goals: string[];
+  reasons: string[];
+  concerns: string[];
+  unknowns: string[];
+  cautions: string[];
+  maintenance: "low" | "medium" | "high";
+  cost_tier: number;
+  nrcs: string[];
+  rules: string[];
+  references: { id: string; title: string; url: string | null; work_license: string }[];
+  tool: "keyline" | "swale" | null;
+  quantity: { basis: QuantityBasis; default: number } | null;
+  has_allowance: boolean;
+  selected: boolean;
+}
+
+export interface Recommendations {
+  brief_complete: boolean;
+  site: { area_m2: number | null; has_terrain: boolean; mean_slope_pct?: number; main_valleys?: number;
+    keypoint_count?: number; terrain_grade?: Grade };
+  items: Recommendation[];
+}
+
+export interface PlanItem {
+  intervention_id: string;
+  title: string;
+  category: InterventionCategory;
+  phase: string;
+  tool: "keyline" | "swale" | null;
+  quantity_basis: QuantityBasis | null;
+  /** Metric, in the item's basis (m², m, m³ or a count). */
+  quantity: number | null;
+  notes: string | null;
+  cost_item: string | null;
+  created_at: string;
 }
 
 export interface KnowledgeHit {
@@ -315,6 +402,18 @@ export const api = {
     request<Proposal>(`/projects/${id}/assistant/proposals/${pid}/accept`, { method: "POST" }),
   discardProposal: (id: string, pid: string) =>
     request<void>(`/projects/${id}/assistant/proposals/${pid}/discard`, { method: "POST" }),
+  getCatalog: () => request<Catalog>("/interventions/catalog"),
+  getBrief: (id: string) => request<Brief>(`/projects/${id}/brief`),
+  /** Merges: fields left out are kept; a field sent as null is cleared. */
+  saveBrief: (id: string, body: BriefUpdate) =>
+    request<Brief>(`/projects/${id}/brief`, { method: "PUT", body: json(body) }),
+  getRecommendations: (id: string) => request<Recommendations>(`/projects/${id}/recommendations`),
+  getPlan: (id: string) => request<PlanItem[]>(`/projects/${id}/plan`),
+  putPlanItem: (id: string, interventionId: string, body: { quantity?: number | null; notes?: string | null } = {}) =>
+    request<PlanItem>(`/projects/${id}/plan/${encodeURIComponent(interventionId)}`, { method: "PUT", body: json(body) }),
+  removePlanItem: (id: string, interventionId: string) =>
+    request<void>(`/projects/${id}/plan/${encodeURIComponent(interventionId)}`, { method: "DELETE" }),
+
   searchKnowledge: (q: string) => request<KnowledgeHit[]>(`/knowledge/search?q=${encodeURIComponent(q)}`),
 
   geocode: (q: string) => request<GeocodeResult[]>(`/geocode?q=${encodeURIComponent(q)}`),

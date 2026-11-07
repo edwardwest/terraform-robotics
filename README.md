@@ -1,18 +1,20 @@
 # Terraform Robotics
 
-Site survey to regenerative design. Terraform Robotics turns ground data (drone LiDAR, public elevation, legacy drawings) into a terrain model, shows where water flows and collects, and lays out permaculture interventions such as keyline patterns. The designs are built to feed an autonomous solar keyline robot.
+Site survey to regenerative design. Terraform Robotics starts from what a person wants from their land, turns ground data (drone LiDAR, public elevation, legacy drawings) into a terrain model, ranks permaculture interventions (water harvesting, earthworks, soil, plants and trees, fire, animals, access) against those goals and the site, and computes keyline patterns and swales where they fit. The keyline designs are built to feed an autonomous solar keyline robot.
 
-This repository holds **Stage 1 (site to terrain)** and **Stage 2 (keyline design, estimate, exports)**. Live at https://web-131142126911.us-west1.run.app (sign-in required).
+This repository holds **Stage 1 (site to terrain)**, **Stage 2 (keyline design, estimate, exports)** and the **goals-first flow** (goals brief, intervention catalog and plan). Live at https://web-131142126911.us-west1.run.app (sign-in required).
 
 ![Terrain and water screen: contours, valleys and two keypoints on a test site](docs/screenshots/stage1-terrain.png)
 
 | Step | What the user does | Built by |
 | --- | --- | --- |
 | 1. Site | Names the project, finds the address and imports the county parcel (Sonoma County), or draws/uploads a boundary | `apps/web`, `tr_api.parcels` |
-| 2. Survey | Adds ground data: drone LiDAR (LAS/LAZ), a DEM, contours, or fetches USGS 3DEP | `tr_api`, `tr_worker` |
-| 3. Terrain | Builds the terrain model: contours, flow paths, valleys, ridges, keypoint candidates, data-quality grades; hillshade, slope and 3D from elevation tiles | `tr_worker`, `tr_geo`, `tr_api.tiles` |
-| 4. Design | Keylines through keypoints at a set grade, parallel or graded rip patterns, swales on contour, with design checks | `tr_geo.design`, `tr_api.design_api` |
-| 5. Estimate and export | Cost estimate from the design and an editable unit-cost library (+ spreadsheet); PDF plan set, GeoJSON/Shapefile/KML, DXF, GPS guidance paths | `tr_api.outputs`, `tr_api.plan_pdf` |
+| 2. Goals | Ranks up to five goals (water, erosion, fire, food, soil, habitat, animals, income, shelter, stormwater) and answers a few questions on land use, water, budget, upkeep and constraints, by form or by interview with the assistant | `tr_api.plan_api`, `tr_api.assistant` |
+| 3. Survey | Adds ground data: drone LiDAR (LAS/LAZ), a DEM, contours, or fetches USGS 3DEP | `tr_api`, `tr_worker` |
+| 4. Terrain | Builds the terrain model: contours, flow paths, valleys, ridges, keypoint candidates, data-quality grades; hillshade, slope and 3D from elevation tiles | `tr_worker`, `tr_geo`, `tr_api.tiles` |
+| 5. Ideas | Browses catalog interventions ranked against the goals and the site (plain code, no model) and adds them to the plan with quantities | `tr_kb.interventions`, `tr_kb/rules/interventions.yaml` |
+| 6. Design | Sees the plan in build order (Yeomans' scale of permanence); keylines through keypoints at a set grade, parallel or graded rip patterns, swales on contour, with design checks | `tr_geo.design`, `tr_api.design_api` |
+| 7. Estimate and export | Cost estimate from the design, planning allowances for the rest of the plan, and an editable unit-cost library (+ spreadsheet); PDF plan set, GeoJSON/Shapefile/KML, DXF, GPS guidance paths | `tr_api.outputs`, `tr_api.plan_pdf` |
 
 ## Layout
 

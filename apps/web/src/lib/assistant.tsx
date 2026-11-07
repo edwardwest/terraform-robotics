@@ -5,6 +5,10 @@
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AssistantReply, AssistantStep, ChatMessage, Proposal } from "./api";
+import { STEP_PATH, stepOf } from "./steps";
+
+/** The prompt that starts the assistant's goals interview (Goals page button, nudges, starters). */
+export const INTERVIEW_PROMPT = "Interview me about my goals for this land.";
 
 export type Turn = ChatMessage & { reply?: AssistantReply };
 
@@ -29,11 +33,14 @@ interface AssistantState {
   setProposals: React.Dispatch<React.SetStateAction<Record<string, Proposal>>>;
   dismissedNudges: string[];
   dismissNudge: (key: string) => void;
+  /** Open the panel and send a prompt, from a button on the page (for example "Talk it through"). */
+  ask: (prompt: string) => void;
+  queued: string | null;
+  clearQueued: () => void;
 }
 
 const Ctx = createContext<AssistantState | null>(null);
 
-const STEP_PATH = /^\/projects\/([^/]+)\/(site|survey|terrain|design|estimate|export)/;
 const MAX_KEPT_TURNS = 40;
 
 function read<T>(storage: () => Storage, key: string, fallback: T): T {
@@ -60,7 +67,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
   const path = usePathname() || "/";
   const m = path.match(STEP_PATH);
   const projectId = m && m[1] !== "new" ? m[1] : null;
-  const step: AssistantStep | null = !m ? null : m[2] === "export" ? "estimate" : (m[2] as AssistantStep);
+  const step: AssistantStep | null = m ? stepOf(m[2]) : null;
 
   const [contexts, setContexts] = useState<Partial<Record<AssistantStep, Record<string, unknown>>>>({});
   const [design, setDesign] = useState<DesignHooks | null>(null);
@@ -68,6 +75,7 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [proposals, setProposals] = useState<Record<string, Proposal>>({});
   const [dismissedNudges, setDismissed] = useState<string[]>([]);
+  const [queued, setQueued] = useState<string | null>(null);
   const loadedFor = useRef<string | null>(null);
 
   // Load this project's conversation (kept for the browser session) when the project changes.
@@ -106,6 +114,14 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
     write(local, "tr.assistant.open", v);
   }, []);
 
+  const ask = useCallback((prompt: string) => {
+    setQueued(prompt);
+    setOpenState(true);
+    write(local, "tr.assistant.open", true);
+  }, []);
+
+  const clearQueued = useCallback(() => setQueued(null), []);
+
   const setPageContext = useCallback((s: AssistantStep, ctx: Record<string, unknown> | null) => {
     setContexts((c) => {
       if (ctx === null) {
@@ -120,9 +136,10 @@ export function AssistantProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AssistantState>(
     () => ({
       projectId, step, pageContext: (step && contexts[step]) || {}, setPageContext, design, setDesign,
-      open, setOpen, turns, setTurns, proposals, setProposals, dismissedNudges, dismissNudge,
+      open, setOpen, turns, setTurns, proposals, setProposals, dismissedNudges, dismissNudge, ask, queued, clearQueued,
     }),
-    [projectId, step, contexts, setPageContext, design, open, setOpen, turns, proposals, dismissedNudges, dismissNudge],
+    [projectId, step, contexts, setPageContext, design, open, setOpen, turns, proposals, dismissedNudges, dismissNudge,
+      ask, queued, clearQueued],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
