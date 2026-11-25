@@ -122,8 +122,23 @@ The goals brief records what the person wants from the land; ideas are catalog i
 
 `GET /api/projects/{id}/recommendations` → `{ brief_complete, site{area_m2, has_terrain, mean_slope_pct?, main_valleys?, keypoint_count?, terrain_grade?}, items: Recommendation[] }`, best first. `Recommendation`: `{ id, title, category, phase, summary, fit: "good"|"possible"|"not_suited", score, matched_goals[], reasons[], concerns[], unknowns[], cautions[], maintenance, cost_tier (1-4), nrcs[], rules[], references[{id,title,url,work_license}], tool: "keyline"|"swale"|null, quantity{basis,default}|null, has_allowance, selected }`. `not_suited` means a hard requirement is missing (area, creek, buildings, a valley); `unknowns` (no terrain model yet, an unanswered question) never demote an item.
 
-`GET /api/projects/{id}/plan` → `PlanItem[]` in build order (P.A. Yeomans' scale of permanence: water, access, trees, buildings, fencing, soil). `PlanItem`: `{ intervention_id, title, category, phase, tool, quantity_basis: "area_m2"|"length_m"|"volume_m3"|"count"|null, quantity, notes, cost_item, created_at }`.
+`GET /api/projects/{id}/plan` → `PlanItem[]` in build order (P.A. Yeomans' scale of permanence: water, access, trees, buildings, fencing, soil). `PlanItem`: `{ intervention_id, title, category, phase, tool, quantity_basis: "area_m2"|"length_m"|"volume_m3"|"count"|null, quantity, notes, cost_item, created_at, placed, measured_quantity }`. `placed` counts proposed master plan features that place the item; `measured_quantity` (metric, in `quantity_basis`, or null) is measured from them and replaces `quantity` in the estimate.
 `PUT /api/projects/{id}/plan/{intervention_id}` with `{ quantity?, notes? }` adds or updates an item (quantity in metric, in the item's basis; defaults to the catalog's). Items with a design tool keep no quantity: their cost comes from the design. `DELETE` removes it (`204`).
+
+## Master plan features
+
+What a person places on the map. Types, the fixed categories and their map colors come from the feature library (`backend/src/tr_kb/rules/plan_features.yaml`, `tr_kb.plan_features`).
+
+`GET /api/plan-features/library` → `{ version, categories[{id,label,color}], types[{id,label,category,geometry: "point"|"line"|"polygon",intervention,intervention_title,status,fields[],defaults{}}], roofs[] }`. `fields` lists the settings a type takes beyond label, status and build phase: `species` (species list, `plant_spacing_m`, `row_spacing_m` for areas, `rows` for lines, `height_m`), `building` (`height_m`, `roof`), `capacity` (`capacity_m3`).
+
+`GET /api/projects/{id}/plan-features` → GeoJSON `FeatureCollection` (EPSG:4326) of `PlanFeature`, oldest first.
+`POST /api/projects/{id}/plan-features` with `{ type, geometry, label?, status?: "proposed"|"existing", build_phase?: 1|2|3, props? }` → `201` `PlanFeature`. The geometry must be the type's kind (Point, LineString, or a Polygon without holes that doesn't cross itself), at most 5,000 points, on or within 500 m of the property. `props` start from the type's `defaults`; settings the type doesn't take are `422`; species must be USDA PLANTS symbols in the `species` table (names are filled in from it). Label defaults to the type's label, status to the type's. Placing a type that has an `intervention` adds that intervention to the plan if it isn't there.
+`PATCH /api/projects/{id}/plan-features/{fid}` with any of `{ type, geometry, label, status, build_phase, props }` → `PlanFeature`. `type` may change only to another type of the same geometry kind; settings the new type doesn't take are dropped and its defaults filled in. `props` replaces the settings as a whole.
+`DELETE /api/projects/{id}/plan-features/{fid}` → `204`. The plan keeps the intervention.
+
+`PlanFeature.properties`: `{ id, type, type_label, category, color, label, status, build_phase, props, intervention, area_m2, length_m, perimeter_m, plant_count, created_at, updated_at }`. Areas and lengths are measured on the spheroid; `plant_count` is area ÷ (row × plant spacing), length ÷ plant spacing × rows, or 1 for a single tree, and null when spacing isn't set. Only `proposed` features count toward the plan and estimate.
+
+Exports include master plan features: GeoJSON (`kind: "plan_feature"`), Shapefile (`plan_points`, `plan_lines`, `plan_areas`), KML (a folder per category, styled in its color) and DXF (a `PLAN_<CATEGORY>` layer per category in use, with labels).
 
 ## Design (Stage 2)
 

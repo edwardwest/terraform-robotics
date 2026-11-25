@@ -1,5 +1,5 @@
 // Monochrome MapLibre layer definitions for the terrain analysis layers.
-import type { LayerSpecification } from "maplibre-gl";
+import type { ExpressionSpecification, LayerSpecification } from "maplibre-gl";
 
 export type ToggleKey = "contours" | "flow" | "valleys" | "ridges" | "keypoints" | "hillshade" | "slope";
 
@@ -178,3 +178,81 @@ export const previewLayers: LayerSpecification[] = [
 ];
 
 export const DESIGN_CLICK_LAYERS = ["design-keyline", "design-rip", "design-swale"];
+
+/**
+ * Master plan features. Colors come from each feature's category (`color`, from the feature library): the one place
+ * the app uses hue, so the map reads like a master plan. Existing features are drawn fainter and dashed.
+ */
+const existing: ExpressionSpecification = ["==", ["get", "status"], "existing"];
+export const PLAN_CLICK_LAYERS = ["plan-fill", "plan-line", "plan-point"];
+export const planLayers: LayerSpecification[] = [
+  {
+    id: "plan-fill",
+    type: "fill",
+    source: "plan",
+    filter: ["==", ["geometry-type"], "Polygon"],
+    paint: { "fill-color": ["get", "color"], "fill-opacity": ["case", existing, 0.28, 0.5] },
+  },
+  {
+    id: "plan-outline",
+    type: "line",
+    source: "plan",
+    filter: ["all", ["==", ["geometry-type"], "Polygon"], ["!", existing]],
+    paint: { "line-color": ["get", "color"], "line-width": 1.5 },
+  },
+  {
+    id: "plan-outline-existing",
+    type: "line",
+    source: "plan",
+    filter: ["all", ["==", ["geometry-type"], "Polygon"], existing],
+    paint: { "line-color": ["get", "color"], "line-width": 1.25, "line-dasharray": [3, 2] },
+  },
+  {
+    id: "plan-line-casing",
+    type: "line",
+    source: "plan",
+    filter: ["==", ["geometry-type"], "LineString"],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#000000", "line-width": ["case", ["==", ["get", "category"], "access"], 8, 5], "line-opacity": 0.6 },
+  },
+  {
+    id: "plan-line",
+    type: "line",
+    source: "plan",
+    filter: ["==", ["geometry-type"], "LineString"],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: {
+      "line-color": ["get", "color"],
+      "line-width": ["case", ["==", ["get", "category"], "access"], 5, 3],
+      "line-opacity": ["case", existing, 0.6, 1],
+    },
+  },
+  {
+    id: "plan-point",
+    type: "circle",
+    source: "plan",
+    filter: ["==", ["geometry-type"], "Point"],
+    paint: {
+      "circle-radius": 6,
+      "circle-color": ["get", "color"],
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 1.5,
+      "circle-opacity": ["case", existing, 0.6, 1],
+    },
+  },
+  {
+    id: "plan-selected-area",
+    type: "line",
+    source: "plan",
+    filter: ["==", ["get", "id"], "__none__"],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#ffffff", "line-width": 2.5, "line-dasharray": [2, 1.5] },
+  },
+  {
+    id: "plan-selected-point",
+    type: "circle",
+    source: "plan",
+    filter: ["all", ["==", ["get", "id"], "__none__"], ["==", ["geometry-type"], "Point"]],
+    paint: { "circle-radius": 10, "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 },
+  },
+];

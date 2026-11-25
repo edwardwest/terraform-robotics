@@ -1,13 +1,16 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Feature, FeatureCollection, LineString, Point, Polygon } from "geojson";
-import type { GeoJSONSource, Marker } from "maplibre-gl";
+import type { GeoJSONSource, Map as MLMap, Marker } from "maplibre-gl";
 import type { DesignCollection, FlowProps, KeypointProps, LayerName, Project, TerrainSummary } from "@/lib/api";
 import { ensureMaplibre, SATELLITE_TILES, setSatelliteVisible } from "@/lib/maplibre";
 import { useMap } from "@/lib/useMap";
 import { emptyFC, polygonFeature } from "@/lib/geo";
 import { IconMap, IconMinus, IconPlus, IconRotate3d, IconRuler } from "../Icons";
-import { analysisLayers, boundaryLayers, DESIGN_CLICK_LAYERS, designLayers, LAYER_IDS, previewLayers, sectionLayers, type ToggleKey } from "./layers";
+import {
+  analysisLayers, boundaryLayers, DESIGN_CLICK_LAYERS, designLayers, LAYER_IDS, PLAN_CLICK_LAYERS, planLayers, previewLayers,
+  sectionLayers, type ToggleKey,
+} from "./layers";
 import styles from "./TerrainMap.module.css";
 
 export type LayerData = Partial<Record<LayerName, FeatureCollection>>;
@@ -35,6 +38,13 @@ interface Props {
   preview?: FeatureCollection | null;
   /** Label for the map's own section-drawing chip; hidden when false. */
   showSectionTool?: boolean;
+  /** Master plan features (colored by category). */
+  planFeatures?: FeatureCollection | null;
+  selectedPlanFeature?: string | null;
+  /** Clicking a plan feature selects it (and clicking empty map clears the selection) while this is set. */
+  onSelectPlanFeature?: ((id: string | null) => void) | null;
+  /** The MapLibre map once its style has loaded (null on teardown), for tools that draw on it. */
+  onMapReady?: (map: MLMap | null) => void;
 }
 
 /** Mark the highest-order streams as main flow. */
@@ -70,6 +80,10 @@ export function TerrainMap({
   pending = [],
   preview = null,
   showSectionTool = true,
+  planFeatures = null,
+  selectedPlanFeature = null,
+  onSelectPlanFeature = null,
+  onMapReady,
 }: Props) {
   const { containerRef, map, error } = useMap();
   const [pitched, setPitched] = useState(false);
@@ -81,16 +95,25 @@ export function TerrainMap({
   onSectionClickRef.current = onSectionClick;
   const onSelectRef = useRef(onSelectKeypoint);
   onSelectRef.current = onSelectKeypoint;
-  const mapClickRef = useRef({ active: mapClickActive, fn: onMapClick, select: onSelectElement });
-  mapClickRef.current = { active: mapClickActive, fn: onMapClick, select: onSelectElement };
+  const mapClickRef = useRef({ active: mapClickActive, fn: onMapClick, select: onSelectElement, selectPlan: onSelectPlanFeature });
+  mapClickRef.current = { active: mapClickActive, fn: onMapClick, select: onSelectElement, selectPlan: onSelectPlanFeature };
+  const onMapReadyRef = useRef(onMapReady);
+  onMapReadyRef.current = onMapReady;
+
+  useEffect(() => {
+    onMapReadyRef.current?.(map);
+    return () => onMapReadyRef.current?.(null);
+  }, [map]);
 
   // Sources and layers, added once.
   useEffect(() => {
     if (!map) return;
-    for (const id of ["boundary", "contours", "flow", "valleys", "ridges", "section", "design", "pending", "preview"]) {
+    for (const id of ["boundary", "contours", "flow", "valleys", "ridges", "section", "design", "pending", "preview", "plan"]) {
       if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: emptyFC() });
     }
-    for (const l of [...analysisLayers, ...boundaryLayers, ...designLayers, ...previewLayers, ...sectionLayers]) if (!map.getLayer(l.id)) map.addLayer(l);
+    for (const l of [...analysisLayers, ...boundaryLayers, ...planLayers, ...designLayers, ...previewLayers, ...sectionLayers]) {
+      if (!map.getLayer(l.id)) map.addLayer(l);
+    }
     const click = (e: { lngLat: { lng: number; lat: number }; point: { x: number; y: number } }) => {
       const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
       if (sectionModeRef.current) return onSectionClickRef.current(lngLat);
@@ -100,6 +123,14 @@ export function TerrainMap({
         const { x, y } = e.point;
         const hits = map.queryRenderedFeatures([[x - 4, y - 4], [x + 4, y + 4]], { layers: DESIGN_CLICK_LAYERS });
         m.select(hits.length ? String(hits[0].properties?.id) : null);
+      }
+      if (m.selectPlan) {
+        const { x, y } = e.point;
+        // Points and lines first: they sit on top of areas and are harder to hit.
+        const hits = map.queryRenderedFeatures([[x - 5, y - 5], [x + 5, y + 5]], { layers: PLAN_CLICK_LAYERS });
+        const rank = (t: string | undefined) => (t === "Point" ? 0 : t === "LineString" ? 1 : 2);
+        hits.sort((a, b) => rank(a.geometry.type) - rank(b.geometry.type));
+        m.selectPlan(hits.length ? String(hits[0].properties?.id) : null);
       }
     };
     map.on("click", click);
@@ -137,6 +168,22 @@ export function TerrainMap({
   useEffect(() => {
     if (map?.getLayer("design-selected")) map.setFilter("design-selected", ["==", ["get", "id"], selectedElement ?? "__none__"]);
   }, [map, selectedElement]);
+
+  // Master plan features.
+  useEffect(() => {
+    (map?.getSource("plan") as GeoJSONSource | undefined)?.setData(planFeatures ?? emptyFC());
+  }, [map, planFeatures]);
+
+  useEffect(() => {
+    if (!map) return;
+    const id = selectedPlanFeature ?? "__none__";
+    if (map.getLayer("plan-selected-area")) {
+      map.setFilter("plan-selected-area", ["all", ["==", ["get", "id"], id], ["!=", ["geometry-type"], "Point"]]);
+    }
+    if (map.getLayer("plan-selected-point")) {
+      map.setFilter("plan-selected-point", ["all", ["==", ["get", "id"], id], ["==", ["geometry-type"], "Point"]]);
+    }
+  }, [map, selectedPlanFeature]);
 
   useEffect(() => {
     (map?.getSource("preview") as GeoJSONSource | undefined)?.setData(preview ?? emptyFC());

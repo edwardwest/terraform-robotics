@@ -1,0 +1,149 @@
+# Master plan feature library: the things a person can place on the map, how they are classified and drawn, and
+# which catalog intervention (interventions.yaml) each one measures.
+#
+# The interface stays monochrome. These category colors are the one exception: they are used only on the map, in
+# the 3D view, on the master plan sheet and in map exports (KML, DXF), as legend swatches next to features.
+#
+# Fields
+#   categories:   fixed set (no user-defined categories yet). color: map color (hex).
+#   types:
+#     id, label, category
+#     geometry:      point | line | polygon
+#     intervention:  catalog id this feature measures. Placed features replace the plan's planning quantity in the
+#                    estimate: polygons give area, lines give length, points give a count (by the intervention's
+#                    quantity basis). Volume-basis interventions use each feature's capacity setting.
+#     status:        default status for new features: proposed (default) or existing
+#     fields:        settings the properties panel shows, beyond label, status and build phase:
+#                      species   species list from USDA PLANTS, with plant spacing (and row spacing for areas, rows for lines)
+#                      building  height and roof type (used by the 3D view)
+#                      capacity  storage volume (cisterns, tanks)
+#     defaults:      metric starting values for those settings (row_spacing_m, plant_spacing_m, rows, height_m, roof)
+version: "0.1"
+
+categories:
+  - {id: water, label: Water, color: "#5b9bd5"}
+  - {id: annuals, label: Annual crops, color: "#d9b45a"}
+  - {id: trees, label: Trees and perennials, color: "#7fb069"}
+  - {id: habitat, label: Habitat, color: "#4f7f56"}
+  - {id: animals, label: Animals, color: "#b08a6a"}
+  - {id: structures, label: Structures, color: "#a35454"}
+  - {id: access, label: Access, color: "#bdb8ab"}
+  - {id: energy, label: Energy and cycling, color: "#9b7fc4"}
+  - {id: fire, label: Fire safety, color: "#e0703a"}
+
+types:
+  # ---- Water
+  - {id: pond, label: Pond, category: water, geometry: polygon, intervention: pond}
+  - {id: rain-garden, label: Rain garden, category: water, geometry: polygon, intervention: rain-garden}
+  - {id: cistern, label: Cistern or tank, category: water, geometry: point, intervention: roof-catchment, fields: [capacity]}
+  - {id: greywater, label: Greywater basins, category: water, geometry: point, intervention: greywater-laundry}
+  - {id: check-dam, label: Check dam, category: water, geometry: point, intervention: check-dams}
+  - {id: trough, label: Trough, category: water, geometry: point}
+  - {id: well-spring, label: Well or spring, category: water, geometry: point, status: existing}
+  - {id: creek, label: Creek or channel, category: water, geometry: line, status: existing}
+  - {id: water-line, label: Water line, category: water, geometry: line}
+
+  # ---- Annual crops
+  - {id: vegetable-garden, label: Vegetable garden, category: annuals, geometry: polygon, intervention: kitchen-garden}
+  - {id: sheet-mulch, label: Sheet-mulched beds, category: annuals, geometry: polygon, intervention: sheet-mulch}
+  - {id: cover-crop, label: Cover crop, category: annuals, geometry: polygon, intervention: cover-crop}
+  - {id: field-crops, label: Field or market crops, category: annuals, geometry: polygon}
+
+  # ---- Trees and perennials
+  - id: food-forest
+    label: Food forest
+    category: trees
+    geometry: polygon
+    intervention: food-forest
+    fields: [species]
+    defaults: {row_spacing_m: 4.5, plant_spacing_m: 4.5, height_m: 6}
+  - id: orchard
+    label: Orchard
+    category: trees
+    geometry: polygon
+    intervention: food-forest
+    fields: [species]
+    defaults: {row_spacing_m: 6, plant_spacing_m: 4.5, height_m: 5}
+  - id: berries
+    label: Berries and shrubs
+    category: trees
+    geometry: polygon
+    fields: [species]
+    defaults: {row_spacing_m: 2.5, plant_spacing_m: 1.2, height_m: 1.8}
+  - id: shade-tree
+    label: Tree
+    category: trees
+    geometry: point
+    intervention: shade-trees
+    fields: [species]
+    defaults: {height_m: 12}
+  - id: windbreak
+    label: Windbreak
+    category: trees
+    geometry: line
+    intervention: windbreak
+    fields: [species]
+    defaults: {plant_spacing_m: 3, rows: 2, height_m: 10}
+
+  # ---- Habitat
+  - id: existing-forest
+    label: Existing forest or woodland
+    category: habitat
+    geometry: polygon
+    status: existing
+    fields: [species]
+    defaults: {height_m: 18}
+  - id: meadow
+    label: Pollinator meadow
+    category: habitat
+    geometry: polygon
+    intervention: pollinator-meadow
+    fields: [species]
+  - id: hedgerow
+    label: Hedgerow
+    category: habitat
+    geometry: line
+    intervention: hedgerow
+    fields: [species]
+    defaults: {plant_spacing_m: 1.5, rows: 1, height_m: 3}
+  - id: riparian
+    label: Creek-side planting
+    category: habitat
+    geometry: polygon
+    intervention: riparian-buffer
+    fields: [species]
+    defaults: {row_spacing_m: 3, plant_spacing_m: 3, height_m: 8}
+
+  # ---- Animals
+  - {id: paddock, label: Paddock or pasture, category: animals, geometry: polygon, intervention: rotational-grazing}
+  - {id: poultry-coop, label: Poultry coop, category: animals, geometry: point, intervention: poultry}
+  - {id: poultry-yard, label: Poultry yard, category: animals, geometry: polygon}
+  - {id: apiary, label: Apiary, category: animals, geometry: point}
+  - {id: fence, label: Fence, category: animals, geometry: line}
+  - {id: gate, label: Gate, category: animals, geometry: point}
+
+  # ---- Structures
+  - {id: house, label: House, category: structures, geometry: polygon, status: existing, fields: [building], defaults: {height_m: 7, roof: gable}}
+  - {id: barn, label: Barn or shop, category: structures, geometry: polygon, fields: [building], defaults: {height_m: 8, roof: gable}}
+  - {id: shed, label: Shed or animal shelter, category: structures, geometry: polygon, fields: [building], defaults: {height_m: 3.5, roof: shed}}
+  - {id: high-tunnel, label: Greenhouse or high tunnel, category: structures, geometry: polygon, intervention: high-tunnel, fields: [building], defaults: {height_m: 3.5, roof: gable}}
+  - {id: gathering, label: Patio or gathering space, category: structures, geometry: polygon}
+
+  # ---- Access
+  - {id: road, label: Road or driveway, category: access, geometry: line, intervention: access-on-contour}
+  - {id: path, label: Path, category: access, geometry: line}
+  - {id: parking, label: Parking, category: access, geometry: polygon}
+  - {id: bridge, label: Bridge or crossing, category: access, geometry: point}
+
+  # ---- Energy and cycling
+  - {id: solar, label: Solar array, category: energy, geometry: polygon}
+  - {id: compost, label: Compost, category: energy, geometry: point, intervention: compost-system}
+  - {id: compost-area, label: Compost application area, category: energy, geometry: polygon, intervention: compost-application}
+  - {id: biomass, label: Biomass stockpile, category: energy, geometry: polygon}
+  - {id: firewood, label: Firewood storage, category: energy, geometry: point}
+
+  # ---- Fire safety
+  - {id: defensible-space, label: Defensible space, category: fire, geometry: polygon, intervention: defensible-space}
+  - {id: fuel-break, label: Fuel break, category: fire, geometry: polygon, intervention: fuel-break}
+  - {id: brush-berm, label: Brush berm, category: fire, geometry: line, intervention: brush-berms}
+  - {id: fire-water, label: Firefighting water, category: fire, geometry: point, fields: [capacity]}

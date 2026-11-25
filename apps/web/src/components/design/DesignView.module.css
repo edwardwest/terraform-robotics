@@ -190,3 +190,12 @@
   font-weight: 700;
   font-size: 15px;
 }
+
+.modeSwitch {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.modeSwitch a {
+  text-decoration: none;
+}

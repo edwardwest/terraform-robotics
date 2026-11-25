@@ -59,15 +59,24 @@ def site_facts(project_id: UUID, project: dict) -> dict:
 
 
 def plan_rows(project_id: UUID) -> list[dict]:
+    """The plan in build order. `placed` and `measured_quantity` come from master plan features that place each
+    intervention; a measured quantity replaces the planning quantity in the estimate."""
+    from tr_kb import plan_features as pf
+
+    from .plan_features_api import feature_rows
+
     rows = {r["intervention_id"]: r for r in fetch_all(
         "SELECT intervention_id, quantity, notes, created_at FROM project_plan WHERE project_id = :id", id=str(project_id))}
+    features = feature_rows(project_id) if rows else []
     out = []
     for item in iv.sequence(list(rows)):
         r = rows[item["id"]]
         out.append({"intervention_id": item["id"], "title": item["title"], "category": item["category"],
                     "phase": item["phase"], "tool": item["tool"],
                     "quantity_basis": (item["quantity"] or {}).get("basis"), "quantity": r["quantity"],
-                    "notes": r["notes"], "cost_item": item["cost_item"], "created_at": r["created_at"]})
+                    "notes": r["notes"], "cost_item": item["cost_item"], "created_at": r["created_at"],
+                    "placed": sum(1 for f in features if f["intervention"] == item["id"] and f["status"] == "proposed"),
+                    "measured_quantity": pf.measured_quantity(item["id"], features)})
     return out
 
 

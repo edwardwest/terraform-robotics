@@ -100,7 +100,7 @@ def search(conn, q: str, limit: int = 6, source: str | None = None, commercial_o
 
 
 SPECIES_FILTERS = {
-    "growth_habit": "traits->>'growth_habit' ILIKE :growth_habit",
+    "growth_habit": "coalesce(traits->>'growth_habit', traits->>'growth_form') ILIKE :growth_habit",
     "nitrogen_fixation": "coalesce(traits->>'nitrogen_fixation', '') NOT IN ('', 'None', 'none', 'No')",
     "drought_tolerance": "traits->>'drought_tolerance' ILIKE :drought_tolerance",
     "shade_tolerance": "traits->>'shade_tolerance' ILIKE :shade_tolerance",
