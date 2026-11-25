@@ -8,7 +8,7 @@ Terraform Robotics: site survey → terrain model → regenerative design. See R
 - **Analysis runs in a projected CRS.** `tr_geo` works on a DEM in a local UTM zone; reproject vectors back to EPSG:4326 at the API boundary.
 - `tr_geo` is pure (numpy/shapely/rasterio, no database, no network). Keep it testable with synthetic terrain in `backend/tests`.
 - Contract changes: update `docs/api.md`, `tr_api/schemas.py` and `apps/web/src/lib/api.ts` together.
-- Styling: only design tokens from `packages/design-tokens/tokens.json` (monochrome; no accent hue). No emoji in UI.
+- Styling: only design tokens from `packages/design-tokens/tokens.json` (monochrome; no accent hue). No emoji in UI. One exception: master plan category colors from `tr_kb/rules/plan_features.yaml`, used only on the map, in the 3D view, on the master plan sheet, in map exports, and as legend swatches next to features.
 - Hosting target is Google Cloud (Cloud Run, Cloud Run Jobs, Cloud SQL for PostgreSQL + PostGIS, Cloud Storage). Don't add AWS-specific dependencies.
 
 ## Stage 2 notes

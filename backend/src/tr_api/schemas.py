@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from shapely.geometry import shape
 
 BoundarySource = Literal["parcel", "upload", "drawn"]
@@ -390,3 +390,75 @@ class PlanItem(BaseModel):
     notes: str | None
     cost_item: str | None
     created_at: datetime
+    placed: int = 0                          # master plan features that place this intervention
+    measured_quantity: float | None = None   # from those features, in quantity_basis; replaces quantity in the estimate
+
+
+# ---- Master plan features ----------------------------------------------------------------------------
+
+
+class SpeciesRef(BaseModel):
+    symbol: str = Field(min_length=1, max_length=20)  # USDA PLANTS symbol; names are filled in from the table
+    scientific_name: str | None = None
+    common_name: str | None = None
+
+
+class PlanFeatureProps(BaseModel):
+    """Settings; which ones a type takes is in the library (`fields`). Metric."""
+    model_config = ConfigDict(extra="forbid")
+    species: list[SpeciesRef] | None = Field(default=None, max_length=30)
+    plant_spacing_m: float | None = Field(default=None, gt=0.1, le=50)
+    row_spacing_m: float | None = Field(default=None, gt=0.1, le=50)
+    rows: int | None = Field(default=None, ge=1, le=10)
+    height_m: float | None = Field(default=None, gt=0, le=80)
+    roof: Literal["gable", "hip", "shed", "flat"] | None = None
+    capacity_m3: float | None = Field(default=None, ge=0, le=100000)
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class PlanFeatureCreate(BaseModel):
+    type: str = Field(min_length=1, max_length=40)
+    geometry: dict
+    label: str | None = Field(default=None, max_length=80)
+    status: Literal["proposed", "existing"] | None = None
+    build_phase: int | None = Field(default=None, ge=1, le=3)
+    props: PlanFeatureProps | None = None
+
+
+class PlanFeatureUpdate(BaseModel):
+    type: str | None = Field(default=None, min_length=1, max_length=40)
+    geometry: dict | None = None
+    label: str | None = Field(default=None, max_length=80)
+    status: Literal["proposed", "existing"] | None = None
+    build_phase: int | None = Field(default=None, ge=1, le=3)
+    props: PlanFeatureProps | None = None
+
+
+class PlanFeatureProperties(BaseModel):
+    id: str
+    type: str
+    type_label: str
+    category: str
+    color: str
+    label: str | None
+    status: Literal["proposed", "existing"]
+    build_phase: int
+    props: dict
+    intervention: str | None
+    area_m2: float | None
+    length_m: float | None
+    perimeter_m: float | None
+    plant_count: int | None
+    created_at: str
+    updated_at: str
+
+
+class PlanFeature(BaseModel):
+    type: Literal["Feature"] = "Feature"
+    geometry: dict
+    properties: PlanFeatureProperties
+
+
+class PlanFeatureCollection(BaseModel):
+    type: Literal["FeatureCollection"] = "FeatureCollection"
+    features: list[PlanFeature]

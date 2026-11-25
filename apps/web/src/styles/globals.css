@@ -215,13 +215,15 @@ button, input, select, textarea {
 }
 
 /* Selected: inverted (white fill, black text) so it reads at a glance against unselected pills. */
-.chip[aria-pressed="true"] {
+.chip[aria-pressed="true"],
+.chip[aria-current="page"] {
   background: var(--white);
   border-color: var(--white);
   color: var(--ink-0);
 }
 
-.chip[aria-pressed="true"]:hover:not(:disabled) {
+.chip[aria-pressed="true"]:hover:not(:disabled),
+.chip[aria-current="page"]:hover {
   background: var(--stone-200);
   border-color: var(--stone-200);
 }

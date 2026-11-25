@@ -1,0 +1,321 @@
+/* Master plan mode. Category swatches are the one use of hue in the interface: they key the map's colors. */
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.itemTitle {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--fg-1);
+}
+
+.mapWrap {
+  position: relative;
+}
+
+.drawBar {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100% - 2 * var(--space-3));
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-strong);
+  background: var(--ink-100);
+  z-index: 3;
+}
+
+.drawBar :global(.app-small) {
+  color: var(--fg-1);
+}
+
+/* To place */
+.toPlace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.toPlaceList,
+.typeList,
+.layerList,
+.featureList,
+.speciesList,
+.results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toPlaceBtn,
+.typeBtn,
+.featureMain,
+.resultBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--touch);
+  padding: 6px var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fg-2);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--fade), background-color var(--fade);
+}
+
+.toPlaceBtn {
+  border: 1px dashed var(--border-strong);
+}
+
+.toPlaceBtn:hover:not(:disabled),
+.typeBtn:hover:not(:disabled),
+.featureMain:hover,
+.resultBtn:hover {
+  border-color: var(--border-strong);
+}
+
+.toPlaceBtn[aria-pressed="true"],
+.typeBtn[aria-pressed="true"] {
+  background: var(--white);
+  border-color: var(--white);
+  color: var(--ink-0);
+}
+
+.toPlaceBtn[aria-pressed="true"] .itemTitle,
+.toPlaceBtn[aria-pressed="true"] :global(.app-small) {
+  color: var(--ink-0);
+}
+
+.toPlaceBtn:disabled,
+.typeBtn:disabled {
+  cursor: not-allowed;
+  color: var(--fg-faint);
+}
+
+.toPlaceText,
+.featureText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Library */
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-1);
+}
+
+.category {
+  border-bottom: 1px solid var(--rule);
+}
+
+.categoryHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch);
+  cursor: pointer;
+  list-style: none;
+}
+
+.categoryHead::-webkit-details-marker {
+  display: none;
+}
+
+.categoryHead::after {
+  content: "+";
+  margin-left: auto;
+  color: var(--fg-3);
+  font-weight: 700;
+}
+
+.category[open] > .categoryHead::after {
+  content: "–";
+}
+
+.categoryLabel {
+  flex: 1;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--fg-1);
+}
+
+.typeList {
+  padding: 0 0 var(--space-1) var(--space-1);
+}
+
+.typeBtn {
+  font-size: 14px;
+  min-height: 36px;
+}
+
+.glyph {
+  flex-shrink: 0;
+  color: var(--fg-3);
+}
+
+.typeBtn[aria-pressed="true"] .glyph {
+  color: var(--ink-0);
+}
+
+/* Layers panel */
+.layerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  cursor: pointer;
+}
+
+.layerRow input,
+.check input {
+  accent-color: var(--white);
+}
+
+.group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.group legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+/* Feature list */
+.featureRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.featureMain {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Properties */
+.props {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.propsHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.propsHead :global(.app-eyebrow) {
+  flex: 1;
+  margin: 0;
+}
+
+.measures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.measures dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.notes {
+  min-height: 72px;
+  padding-top: 10px;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Species */
+.species {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.speciesItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: 4px 0 4px var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--surface-pill);
+}
+
+.speciesItem > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sci {
+  font-style: italic;
+}
+
+.results {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.resultBtn {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}

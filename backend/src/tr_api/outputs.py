@@ -131,15 +131,19 @@ def plan_allowance_lines(project_id: UUID, costs: dict[str, dict]) -> list[dict]
     lines = []
     for p in plan_rows(project_id):
         c = costs.get(p["cost_item"] or "")
-        if not c or not p["quantity"] or p["tool"]:
+        measured = p.get("measured_quantity")
+        planned = measured if measured is not None else p["quantity"]
+        if not c or not planned or p["tool"]:
             continue
-        qty = iv.quantity_in_cost_unit(p["quantity_basis"], float(p["quantity"]), c["unit"])
+        qty = iv.quantity_in_cost_unit(p["quantity_basis"], float(planned), c["unit"])
         if qty <= 0:
             continue
+        basis = (f"Measured from {p['placed']} feature{'s' if p['placed'] != 1 else ''} on your master plan"
+                 if measured is not None else "Planning allowance from your plan")
         lines.append({"item": p["cost_item"], "label": p["title"], "quantity": round(qty, 2), "unit": c["unit"],
                       "rate_low": c["rate_low"], "rate_high": c["rate_high"],
                       "total_low": round(qty * c["rate_low"], 2), "total_high": round(qty * c["rate_high"], 2),
-                      "basis": "Planning allowance from your plan", "group": "plan"})
+                      "basis": basis, "group": "plan"})
     return lines
 
 
@@ -280,17 +284,49 @@ def _element_props(r: dict) -> dict:
     return out
 
 
+def _plan_export(project_id: UUID) -> list[dict]:
+    """Master plan features with shapely geometry, for the exports."""
+    from shapely.geometry import shape
+
+    from .plan_features_api import feature_rows
+
+    return [{**r, "geom": shape(r["geometry"])} for r in feature_rows(project_id)]
+
+
+def _plan_props(r: dict) -> dict:
+    from tr_kb import plan_features as pf
+
+    t = pf.types_by_id()[r["type"]]
+    out = {"kind": "plan_feature", "type": r["type"], "type_label": t["label"], "category": r["category"],
+           "label": r["label"], "status": r["status"], "build_phase": r["build_phase"]}
+    if r["area_m2"] is not None:
+        out["area_m2"] = round(r["area_m2"], 1)
+    if r["length_m"] is not None:
+        out["length_m"] = round(r["length_m"], 1)
+    n = pf.plant_count(t, r["props"], r["area_m2"], r["length_m"])
+    if n:
+        out["plant_count"] = n
+    if r["props"].get("species"):
+        out["species"] = "; ".join(sp["scientific_name"] for sp in r["props"]["species"])
+    for k in ("plant_spacing_m", "row_spacing_m", "rows", "height_m", "roof", "capacity_m3", "notes"):
+        if r["props"].get(k) is not None:
+            out[k] = r["props"][k]
+    return out
+
+
 @router.get("/api/projects/{project_id}/export/geojson")
 def export_geojson(project_id: UUID, user: CurrentUser):
     project, rows, keypoints = _export_rows(project_id, user)
     feats = [{"type": "Feature", "geometry": project["boundary"], "properties": {"kind": "boundary", "label": project["name"]}}]
     feats += [{"type": "Feature", "geometry": mapping(g), "properties": {"kind": "keypoint", **p}} for g, p in keypoints]
     feats += [{"type": "Feature", "geometry": mapping(r["geom"]), "properties": _element_props(r)} for r in rows]
+    feats += [{"type": "Feature", "geometry": r["geometry"], "properties": _plan_props(r)} for r in _plan_export(project_id)]
     body = json.dumps({"type": "FeatureCollection", "features": feats})
     return _download(body.encode(), f"{_slug(project['name'])}-design.geojson", "application/geo+json")
 
 
-def _shapefile_zip(name: str, rows: list[dict], boundary: Polygon | None, keypoints: list) -> bytes:
+def _shapefile_zip(name: str, rows: list[dict], boundary: Polygon | None, keypoints: list,
+                   plan: list[dict] | None = None) -> bytes:
     import shapefile  # pyshp
 
     buf = io.BytesIO()
@@ -331,13 +367,37 @@ def _shapefile_zip(name: str, rows: list[dict], boundary: Polygon | None, keypoi
                     w.point(g.x, g.y)
                     w.record(p.get("id", ""), float(p.get("elevation_m", 0) or 0))
             add("keypoints", pts)
+        for stem, kind, shp_type in (("plan_points", "Point", 1), ("plan_lines", "LineString", 3), ("plan_areas", "Polygon", 5)):
+            feats = [r for r in plan or [] if r["geom"].geom_type == kind]
+            if not feats:
+                continue
+
+            def plan_layer(w, feats=feats, kind=kind, shp_type=shp_type):
+                w.shapeType = shp_type
+                for f, t, size in (("TYPE", "C", 24), ("CATEGORY", "C", 16), ("LABEL", "C", 80), ("STATUS", "C", 10),
+                                   ("PHASE", "N", 2), ("AREA_M2", "F", 14), ("LENGTH_M", "F", 12), ("PLANTS", "N", 8),
+                                   ("SPECIES", "C", 254)):
+                    w.field(f, t, size, 2 if t == "F" else 0)
+                for r in feats:
+                    g = r["geom"]
+                    if kind == "Point":
+                        w.point(g.x, g.y)
+                    elif kind == "LineString":
+                        w.line([list(g.coords)])
+                    else:
+                        w.poly([list(g.exterior.coords)])
+                    p = _plan_props(r)
+                    w.record(r["type"], r["category"], (r["label"] or "")[:80], r["status"], int(r["build_phase"]),
+                             float(p.get("area_m2", 0)), float(p.get("length_m", 0)), int(p.get("plant_count", 0)),
+                             str(p.get("species", ""))[:254])
+            add(stem, plan_layer)
     return buf.getvalue()
 
 
 @router.get("/api/projects/{project_id}/export/shapefile")
 def export_shapefile(project_id: UUID, user: CurrentUser):
     project, rows, keypoints = _export_rows(project_id, user)
-    data = _shapefile_zip(_slug(project["name"]), rows, _boundary_shape(project), keypoints)
+    data = _shapefile_zip(_slug(project["name"]), rows, _boundary_shape(project), keypoints, _plan_export(project_id))
     return _download(data, f"{_slug(project['name'])}-shapefile.zip", "application/zip")
 
 
@@ -358,7 +418,37 @@ def export_kml(project_id: UUID, user: CurrentUser):
     for r in rows:
         parts.append(f"<Placemark><name>{escape(r['label'] or r['kind'])}</name><styleUrl>#{r['kind']}</styleUrl>"
                      f"<LineString><tessellate>1</tessellate><coordinates>{coords(r['geom'])}</coordinates></LineString></Placemark>")
+    from tr_kb import plan_features as pf
+
+    by_cat: dict[str, list[str]] = {}
+    for r in _plan_export(project_id):
+        g = r["geom"]
+        name = escape(r["label"] or r["type"])
+        if g.geom_type == "Point":
+            body = f"<Point><coordinates>{g.x:.7f},{g.y:.7f},0</coordinates></Point>"
+        elif g.geom_type == "LineString":
+            body = f"<LineString><tessellate>1</tessellate><coordinates>{coords(g)}</coordinates></LineString>"
+        else:
+            body = (f"<Polygon><tessellate>1</tessellate><outerBoundaryIs><LinearRing><coordinates>{coords(g.exterior)}"
+                    f"</coordinates></LinearRing></outerBoundaryIs></Polygon>")
+        desc = escape(", ".join(f"{k.replace('_', ' ')}: {v}" for k, v in _plan_props(r).items()
+                                if k not in ("kind", "label", "category")))
+        by_cat.setdefault(r["category"], []).append(
+            f"<Placemark><name>{name}</name><description>{desc}</description><styleUrl>#plan-{r['category']}</styleUrl>{body}</Placemark>")
+    for cat in pf.library()["categories"]:
+        if cat["id"] in by_cat:
+            parts.append(f"<Folder><name>{escape(cat['label'])}</name>{''.join(by_cat[cat['id']])}</Folder>")
+
+    def kml_color(hex_rgb: str, alpha: str) -> str:
+        h = hex_rgb.lstrip("#")
+        return f"{alpha}{h[4:6]}{h[2:4]}{h[0:2]}"
+
     styles = "".join(f'<Style id="{k}"><LineStyle><color>ffffffff</color><width>{w}</width></LineStyle></Style>' for k, w in widths.items())
+    styles += "".join(
+        f'<Style id="plan-{c["id"]}"><LineStyle><color>{kml_color(c["color"], "ff")}</color><width>3</width></LineStyle>'
+        f'<PolyStyle><color>{kml_color(c["color"], "80")}</color></PolyStyle>'
+        f'<IconStyle><color>{kml_color(c["color"], "ff")}</color></IconStyle></Style>'
+        for c in pf.library()["categories"])
     styles += '<Style id="boundary"><LineStyle><color>ffffffff</color><width>2</width></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>'
     kml = (f'<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>'
            f"<name>{escape(project['name'])}</name>{styles}{''.join(parts)}</Document></kml>")
@@ -401,6 +491,30 @@ def export_dxf(project_id: UUID, user: CurrentUser):
             berm = _berm_line(g, float((r["properties"] or {}).get("width_m", 1.8)), t)
             if berm is not None:
                 msp.add_lwpolyline(list(berm.coords), dxfattribs={"layer": "BERM"})
+    from tr_kb import plan_features as pf
+
+    plan = _plan_export(project_id)
+    for cat in pf.library()["categories"]:
+        if any(r["category"] == cat["id"] for r in plan):
+            h = cat["color"].lstrip("#")
+            layer = doc.layers.add(f"PLAN_{cat['id'].upper()}")
+            layer.rgb = (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+    for r in plan:
+        g = to(r["geom"])
+        layer = f"PLAN_{r['category'].upper()}"
+        if g.geom_type == "Point":
+            msp.add_point((g.x, g.y), dxfattribs={"layer": layer})
+            anchor = (g.x + 2, g.y + 2)
+        elif g.geom_type == "LineString":
+            msp.add_lwpolyline(list(g.coords), dxfattribs={"layer": layer})
+            mid = g.interpolate(0.5, normalized=True)
+            anchor = (mid.x, mid.y)
+        else:
+            msp.add_lwpolyline(list(g.exterior.coords), close=True, dxfattribs={"layer": layer})
+            c = g.representative_point()
+            anchor = (c.x, c.y)
+        if r["label"]:
+            msp.add_text(r["label"], height=2.5, dxfattribs={"layer": layer}).set_placement(anchor)
     for g, p in keypoints:
         pt = to(g)
         msp.add_point((pt.x, pt.y), dxfattribs={"layer": "KEYPOINT"})

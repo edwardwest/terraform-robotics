@@ -1,6 +1,7 @@
 "use client";
 // The plan on the Design step: chosen interventions in build order (Yeomans' scale of permanence). Keyline and
-// swale entries open the matching tool; the rest are carried into the estimate as planning allowances.
+// swale entries open the matching tool; the rest are placed on the master plan (and measured there) or carried into
+// the estimate as planning allowances.
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api, type PlanItem } from "@/lib/api";
@@ -59,12 +60,18 @@ export function PlanPanel({ projectId, onTool, onCount }: {
                   <span className={styles.planText}>
                     <span className={styles.planTitle}>{p.title}</span>
                     <span className="app-small">
-                      {p.tool ? "Computed from the terrain model" : `${formatQuantity(p.quantity_basis, p.quantity)} · allowance in the estimate`}
+                      {p.tool
+                        ? "Computed from the terrain model"
+                        : p.measured_quantity != null
+                          ? `${formatQuantity(p.quantity_basis, p.measured_quantity)} · measured from the master plan`
+                          : `${formatQuantity(p.quantity_basis, p.quantity)} · allowance in the estimate`}
                     </span>
                   </span>
-                  {p.tool && (
+                  {p.tool ? (
                     <button type="button" className="btn btn-sm" onClick={() => onTool(p.tool!)}>Lay out</button>
-                  )}
+                  ) : p.placed === 0 ? (
+                    <Link href={`/projects/${projectId}/design?mode=plan`} className="btn btn-sm">Place</Link>
+                  ) : null}
                 </span>
               </li>
             );

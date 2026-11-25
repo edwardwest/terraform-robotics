@@ -11,6 +11,8 @@ type GisFormat = "geojson" | "shapefile" | "kml";
 export function ExportView({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null);
   const [design, setDesign] = useState<DesignCollection | null>(null);
+  const [planCount, setPlanCount] = useState<number | null>(null);
+  const [hasTerrain, setHasTerrain] = useState(false);
   const [gis, setGis] = useState<GisFormat>("geojson");
   const [guidance, setGuidance] = useState<"geojson" | "shapefile">("shapefile");
   const [error, setError] = useState<string | null>(null);
@@ -25,12 +27,17 @@ export function ExportView({ projectId }: { projectId: string }) {
   useEffect(() => {
     api.getProject(projectId).then(setProject).catch((e: Error) => setError(e.message));
     api.getDesign(projectId).then(setDesign).catch((e: Error) => setError(e.message));
+    api.listPlanFeatures(projectId).then((fc) => setPlanCount(fc.features.length)).catch(() => setPlanCount(0));
+    api.getTerrain(projectId).then((t) => setHasTerrain(!!t)).catch(() => setHasTerrain(false));
   }, [projectId]);
 
   const feats = design?.features ?? [];
   const lines = feats.filter((f) => f.properties.kind !== "swale").length;
   const draft = feats.some((f) => f.properties.draft);
   const empty = design !== null && feats.length === 0;
+  // GIS files carry master plan features too; DXF does once there's a terrain model (it's drawn in the site's UTM zone).
+  const gisEmpty = empty && planCount === 0;
+  const dxfEmpty = empty && !(planCount && hasTerrain);
   const gisHref = gis === "geojson" ? exportUrl.geojson(projectId) : gis === "shapefile" ? exportUrl.shapefile(projectId) : exportUrl.kml(projectId);
 
   return (
@@ -59,7 +66,7 @@ export function ExportView({ projectId }: { projectId: string }) {
         <section className={`card ${styles.exportCard}`}>
           <p className="app-eyebrow">GIS files</p>
           <h2 className="app-h2">Georeferenced layers</h2>
-          <p className="app-small">Keylines, rip lines, swales, keypoints and the property line, in longitude and latitude.</p>
+          <p className="app-small">Keylines, rip lines, swales, keypoints, master plan features and the property line, in longitude and latitude.</p>
           <div className={styles.inline}>
             {(["geojson", "shapefile", "kml"] as const).map((f) => (
               <button key={f} type="button" className="chip" aria-pressed={gis === f} onClick={() => setGis(f)}>
@@ -67,15 +74,15 @@ export function ExportView({ projectId }: { projectId: string }) {
               </button>
             ))}
           </div>
-          <a className={`btn ${empty ? styles.off : ""}`} href={gisHref} download><IconDownload size={16} /> Download</a>
+          <a className={`btn ${gisEmpty ? styles.off : ""}`} href={gisHref} download><IconDownload size={16} /> Download</a>
         </section>
 
         <section className={`card ${styles.exportCard}`}>
           <p className="app-eyebrow">CAD drawing</p>
           <h2 className="app-h2">DXF</h2>
           <p className="app-small">Each element on its own layer, with contours at their elevations. Site coordinates: UTM, metres.</p>
-          <p className="app-small">Layers: BOUNDARY, KEYLINE, RIP, SWALE, BERM, CONTOUR, CONTOUR_INDEX, KEYPOINT</p>
-          <a className={`btn ${empty ? styles.off : ""}`} href={exportUrl.dxf(projectId)} download><IconDownload size={16} /> Download DXF</a>
+          <p className="app-small">Layers: BOUNDARY, KEYLINE, RIP, SWALE, BERM, CONTOUR, CONTOUR_INDEX, KEYPOINT, and PLAN_ plus each master plan category</p>
+          <a className={`btn ${dxfEmpty ? styles.off : ""}`} href={exportUrl.dxf(projectId)} download><IconDownload size={16} /> Download DXF</a>
         </section>
 
         <section className={`card ${styles.exportCard}`}>

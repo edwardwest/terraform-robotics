@@ -272,6 +272,87 @@ export interface PlanItem {
   notes: string | null;
   cost_item: string | null;
   created_at: string;
+  /** Proposed master plan features that place this intervention. */
+  placed: number;
+  /** Measured from those features, in quantity_basis; replaces `quantity` in the estimate. */
+  measured_quantity: number | null;
+}
+
+// ---- Master plan features -------------------------------------------------------------------------
+
+export type PlanGeometryKind = "point" | "line" | "polygon";
+export type PlanField = "species" | "building" | "capacity";
+export type Roof = "gable" | "hip" | "shed" | "flat";
+
+export interface PlanCategory { id: string; label: string; color: string }
+
+export interface PlanFeatureType {
+  id: string;
+  label: string;
+  category: string;
+  geometry: PlanGeometryKind;
+  intervention: string | null;
+  intervention_title: string | null;
+  status: "proposed" | "existing";
+  fields: PlanField[];
+  defaults: Partial<PlanFeatureSettings>;
+}
+
+export interface PlanLibrary { version: string; categories: PlanCategory[]; types: PlanFeatureType[]; roofs: Roof[] }
+
+export interface SpeciesRef { symbol: string; scientific_name: string; common_name: string | null }
+
+/** Settings, metric. Which ones a type takes is in its `fields`. */
+export interface PlanFeatureSettings {
+  species: SpeciesRef[];
+  plant_spacing_m: number;
+  row_spacing_m: number;
+  rows: number;
+  height_m: number;
+  roof: Roof;
+  capacity_m3: number;
+  notes: string;
+}
+
+export interface PlanFeatureProps {
+  id: string;
+  type: string;
+  type_label: string;
+  category: string;
+  color: string;
+  label: string | null;
+  status: "proposed" | "existing";
+  build_phase: 1 | 2 | 3;
+  props: Partial<PlanFeatureSettings>;
+  intervention: string | null;
+  area_m2: number | null;
+  length_m: number | null;
+  perimeter_m: number | null;
+  plant_count: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PlanGeometry = Point | LineString | Polygon;
+export type PlanFeature = Feature<PlanGeometry, PlanFeatureProps>;
+export type PlanFeatureCollection = FeatureCollection<PlanGeometry, PlanFeatureProps>;
+
+export interface PlanFeatureCreate {
+  type: string;
+  geometry: PlanGeometry;
+  label?: string;
+  status?: "proposed" | "existing";
+  build_phase?: 1 | 2 | 3;
+  props?: Partial<PlanFeatureSettings>;
+}
+export type PlanFeatureUpdate = Partial<Omit<PlanFeatureCreate, "props">> & { props?: Partial<PlanFeatureSettings> };
+
+export interface Species {
+  symbol: string;
+  scientific_name: string;
+  common_name: string | null;
+  family: string | null;
+  traits: Record<string, string>;
 }
 
 export interface KnowledgeHit {
@@ -321,6 +402,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try {
       const body = await res.json();
       if (typeof body?.detail === "string") detail = body.detail;
+      else if (Array.isArray(body?.detail) && body.detail[0]?.msg) detail = String(body.detail[0].msg);
       else if (body?.detail) detail = JSON.stringify(body.detail);
     } catch {
       /* not JSON */
@@ -413,6 +495,17 @@ export const api = {
     request<PlanItem>(`/projects/${id}/plan/${encodeURIComponent(interventionId)}`, { method: "PUT", body: json(body) }),
   removePlanItem: (id: string, interventionId: string) =>
     request<void>(`/projects/${id}/plan/${encodeURIComponent(interventionId)}`, { method: "DELETE" }),
+
+  getPlanLibrary: () => request<PlanLibrary>("/plan-features/library"),
+  listPlanFeatures: (id: string) => request<PlanFeatureCollection>(`/projects/${id}/plan-features`),
+  createPlanFeature: (id: string, body: PlanFeatureCreate) =>
+    request<PlanFeature>(`/projects/${id}/plan-features`, { method: "POST", body: JSON.stringify(body) }),
+  updatePlanFeature: (id: string, fid: string, body: PlanFeatureUpdate) =>
+    request<PlanFeature>(`/projects/${id}/plan-features/${fid}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deletePlanFeature: (id: string, fid: string) =>
+    request<void>(`/projects/${id}/plan-features/${fid}`, { method: "DELETE" }),
+  searchSpecies: (q: string, growthHabit?: string) =>
+    request<Species[]>(`/species?q=${encodeURIComponent(q)}&limit=12${growthHabit ? `&growth_habit=${encodeURIComponent(growthHabit)}` : ""}`),
 
   searchKnowledge: (q: string) => request<KnowledgeHit[]>(`/knowledge/search?q=${encodeURIComponent(q)}`),
 

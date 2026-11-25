@@ -1,6 +1,6 @@
 # Step 6: Design ("Put the plan on the land.")
 
-**What it's for:** seeing the plan in build order and laying out the interventions the app computes from the terrain model: keyline patterns and swales. Lines are computed from the terrain model, never drawn by hand.
+**What it's for:** seeing the plan in build order, laying out the interventions the app computes from the terrain model (keyline patterns and swales, in **Earthworks** mode), and drawing everything else on a **Master plan** (the second mode). Keylines and swales are computed from the terrain model, never drawn by hand.
 
 **What's on screen**
 - **Your plan:** the interventions chosen on the Ideas step, in build order after P.A. Yeomans' scale of permanence (water, access, trees, buildings, fencing, soil). Keyline and swale entries have **Lay out**, which opens the matching tool below. Other entries show their quantity and are carried into the estimate as planning allowances. **Edit plan** returns to the Ideas step.
@@ -17,6 +17,15 @@
 - **Pattern** totals: lines, total rip line, area treated, and the build estimate.
 - On planning-grade terrain, a **Draft on planning-grade terrain** checkbox must be ticked to design; lines may sit a metre or more off in the field and exports are marked draft. Coarse terrain is refused.
 - **Assistant proposals** appear dashed on the map with Preview, Accept and Discard. Only Accept adds them to the design.
+
+**Master plan mode** (the Master plan chip at the top of the step)
+- **To place, from your plan:** chosen interventions not yet drawn. Clicking one starts drawing it with the right shape.
+- **Feature library:** nine categories with map colors: Water, Annual crops, Trees and perennials, Habitat, Animals, Structures, Access, Energy and cycling, Fire safety. Each type is drawn as a point (a cistern, a coop), a line (a windbreak, a road, a fence) or an area (a pond, an orchard, a house). Points: click once. Lines: click along, then click the last point again. Areas: click around, then click the first point to close. Escape cancels.
+- Selecting a feature (on the map or in the **Features** list) opens its properties: type, label, **Status** (Proposed or Existing), **Build phase** (1 to 3), measurements, and the settings its type takes: a **species list** from USDA PLANTS with row and plant spacing and mature height (the app counts the plants), building height and roof, or storage capacity in gallons. **Edit shape** lets the person drag corners or the whole shape, then **Save shape**.
+- **Layers:** show or hide categories, show build phases cumulatively (Phase 1, Phases 1–2, all), and show or hide existing features.
+- Proposed features that place a plan intervention are measured (area, length or count) and that measurement replaces the planning allowance in the estimate. Existing features are shown but not priced.
+- Without a terrain model the master plan still works; the map shows the property line only.
+- Species data is uneven: about 2,000 of the 31,673 PLANTS taxa have full traits, and there's no cultivar or rootstock data, so an orchard's mature height is the person's to set.
 
 **Decisions here**
 - Which keypoint to design from, the grade, the spacing and the pattern. Parallel is the traditional choice and easiest to work with machinery; graded holds water movement more evenly on irregular land.

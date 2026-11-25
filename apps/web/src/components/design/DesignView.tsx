@@ -22,6 +22,7 @@ import { SectionProfile } from "../terrain/SectionProfile";
 import tv from "../terrain/TerrainView.module.css";
 import { useAssistantDesign, useAssistantPage } from "@/lib/assistant";
 import { stepCount } from "@/lib/steps";
+import { DesignModeSwitch } from "./DesignModeSwitch";
 import { PlanPanel } from "./PlanPanel";
 import styles from "./DesignView.module.css";
 
@@ -228,6 +229,7 @@ export function DesignView({ projectId, initialTool = "keyline" }: { projectId: 
       <aside className={tv.left} aria-label="Design tools">
         <div className={tv.intro}>
           <p className="app-eyebrow">{project ? `${project.name} · ` : ""}{stepCount("design")}</p>
+          <DesignModeSwitch projectId={projectId} mode="earthworks" />
           <h1 className="app-display">Put the plan on the land.</h1>
           <p className="app-body">
             Your plan in build order, water first. Keyline patterns and swales are computed from the terrain model: each

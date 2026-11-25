@@ -18,6 +18,7 @@ const rate = (lo: number, hi: number) => {
 const plural = (unit: string, q: number) => {
   if (q === 1) return unit;
   if (unit.endsWith("foot")) return unit.replace(/foot$/, "feet");
+  if (unit === "sq ft") return unit;
   return `${unit}s`;
 };
 
@@ -137,7 +138,7 @@ export function EstimateView({ projectId }: { projectId: string }) {
         <div className={styles.itemsHead}>
           <div>
             <p className="app-eyebrow" id="items">Line items</p>
-            <p className="app-small">Design quantities come from the geometry; plan quantities from the Ideas step.</p>
+            <p className="app-small">Design quantities come from the geometry; plan quantities from your master plan where you&apos;ve drawn them, otherwise from the Ideas step.</p>
           </div>
           {!editing ? (
             <button type="button" className="btn btn-sm" onClick={startEdit} disabled={!estimate}>Edit unit costs</button>
@@ -170,7 +171,7 @@ export function EstimateView({ projectId }: { projectId: string }) {
                     <tr className={styles.groupRow}>
                       <td colSpan={4}>
                         <span className={styles.itemLabel}>Planning allowances</span>
-                        <span className="app-small">Wide starter ranges for interventions the design tools don&apos;t compute. Replace with local quotes.</span>
+                        <span className="app-small">Wide starter ranges for the rest of your plan, priced on what you drew or on the Ideas step&apos;s quantities. Replace with local quotes.</span>
                       </td>
                     </tr>
                   )}
