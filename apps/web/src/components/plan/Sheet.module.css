@@ -1,0 +1,157 @@
+/* Master plan sheet page: settings on the left, the sheet preview on the right. */
+.layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-4);
+  align-items: start;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  position: sticky;
+  top: calc(var(--header-h, 72px) + var(--space-2));
+  max-height: calc(100vh - var(--header-h, 72px) - var(--space-4));
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg-2);
+  text-decoration: none;
+  margin-bottom: var(--space-1);
+}
+
+.back:hover {
+  color: var(--fg-1);
+}
+
+.group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.group legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: var(--white);
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.labelList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.linkBtn {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--fg-1);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.notes {
+  min-height: 88px;
+  padding-top: 10px;
+  resize: vertical;
+}
+
+.previewCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.previewBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+}
+
+/* The sheet sits on the dark page like paper; the SVG scales to the column. */
+.paper {
+  border-radius: 4px;
+  overflow: hidden;
+  background: #f7f5ef;
+  aspect-ratio: 17 / 11;
+  transition: opacity var(--fade);
+  touch-action: none;
+}
+
+.paper :global(svg) {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.stale {
+  opacity: 0.7;
+}
+
+.draggable :global(g.lbl) {
+  cursor: grab;
+}
+
+.dragging {
+  cursor: grabbing;
+  opacity: 0.8;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .controls {
+    position: static;
+    max-height: none;
+  }
+}

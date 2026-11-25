@@ -64,6 +64,22 @@ export function ExportView({ projectId }: { projectId: string }) {
         </section>
 
         <section className={`card ${styles.exportCard}`}>
+          <p className="app-eyebrow">Master plan sheet</p>
+          <h2 className="app-h2">Illustrated plan</h2>
+          <ul className="app-small">
+            <li>Every master plan feature, color-coded, over an aerial photo or terrain shading</li>
+            <li>Labels, legend, plant schedule, notes and title block</li>
+            <li>11 × 17 or 24 × 36 in</li>
+          </ul>
+          <div className={styles.inline}>
+            <Link className={`btn ${planCount === 0 ? styles.off : ""}`} href={`/projects/${projectId}/sheet`}>Set up the sheet</Link>
+            <a className={`btn btn-primary ${planCount === 0 ? styles.off : ""}`} href={exportUrl.masterPlanPdf(projectId)} download>
+              <IconDownload size={16} /> PDF
+            </a>
+          </div>
+        </section>
+
+        <section className={`card ${styles.exportCard}`}>
           <p className="app-eyebrow">GIS files</p>
           <h2 className="app-h2">Georeferenced layers</h2>
           <p className="app-small">Keylines, rip lines, swales, keypoints, master plan features and the property line, in longitude and latitude.</p>

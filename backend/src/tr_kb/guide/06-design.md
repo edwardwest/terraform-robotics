@@ -25,6 +25,7 @@
 - **Layers:** show or hide categories, show build phases cumulatively (Phase 1, Phases 1–2, all), and show or hide existing features.
 - Proposed features that place a plan intervention are measured (area, length or count) and that measurement replaces the planning allowance in the estimate. Existing features are shown but not priced.
 - Without a terrain model the master plan still works; the map shows the property line only.
+- **Master plan sheet** (button under the Features list, or the Export step): an illustrated, printable plan. Settings save as they change and the preview updates: sheet size (11 × 17 or 24 × 36 in), title, address line, prepared by, base map (aerial photo, terrain shading, plain; the aerial photo falls back to terrain shading if it can't be loaded), contours, labels (callouts with leader lines, on the features, or off), which labels show, build phases, existing features, categories, the plant schedule and notes. Labels can be dragged on the preview; "Reset moved labels" puts them back. Download PDF gives the same drawing as the preview. Features with the same label share one callout. Tree symbols show the planting pattern; the schedule's plant counts come from the spacing settings.
 - Species data is uneven: about 2,000 of the 31,673 PLANTS taxa have full traits, and there's no cultivar or rootstock data, so an orchard's mature height is the person's to set.
 
 **Decisions here**

@@ -495,6 +495,9 @@ export function MasterPlanView({ projectId }: { projectId: string }) {
         )}
 
         <div className={tv.next}>
+          <Link href={`/projects/${projectId}/sheet`} className="btn">
+            Master plan sheet <IconArrowRight />
+          </Link>
           <Link href={`/projects/${projectId}/estimate`} className="btn btn-primary">
             Review estimate <IconArrowRight />
           </Link>

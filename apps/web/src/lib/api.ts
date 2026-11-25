@@ -347,6 +347,24 @@ export interface PlanFeatureCreate {
 }
 export type PlanFeatureUpdate = Partial<Omit<PlanFeatureCreate, "props">> & { props?: Partial<PlanFeatureSettings> };
 
+/** Master plan sheet settings. Label positions are fractions of the sheet's width and height, keyed by label text. */
+export interface PlanSheetSettings {
+  size: "11x17" | "24x36";
+  title: string;
+  subtitle: string | null;
+  prepared_by: string;
+  notes: string;
+  base: "aerial" | "terrain" | "plain";
+  contours: boolean;
+  labels: "callouts" | "on_features" | "off";
+  phases: 0 | 1 | 2 | 3;
+  show_existing: boolean;
+  hidden_categories: string[];
+  hidden_labels: string[];
+  label_positions: Record<string, [number, number]>;
+  schedule: boolean;
+}
+
 export interface Species {
   symbol: string;
   scientific_name: string;
@@ -504,6 +522,15 @@ export const api = {
     request<PlanFeature>(`/projects/${id}/plan-features/${fid}`, { method: "PATCH", body: JSON.stringify(body) }),
   deletePlanFeature: (id: string, fid: string) =>
     request<void>(`/projects/${id}/plan-features/${fid}`, { method: "DELETE" }),
+  getPlanSheet: (id: string) => request<PlanSheetSettings>(`/projects/${id}/plan-sheet`),
+  putPlanSheet: (id: string, body: PlanSheetSettings) =>
+    request<PlanSheetSettings>(`/projects/${id}/plan-sheet`, { method: "PUT", body: JSON.stringify(body) }),
+  /** The sheet as SVG text (the preview), drawn from the saved settings, and the base map actually used. */
+  getPlanSheetSvg: async (id: string): Promise<{ svg: string; base: PlanSheetSettings["base"] }> => {
+    const res = await fetch(`${BASE}/projects/${id}/plan-sheet/svg`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`The sheet preview didn't load (${res.status}).`);
+    return { svg: await res.text(), base: (res.headers.get("x-sheet-base") ?? "plain") as PlanSheetSettings["base"] };
+  },
   searchSpecies: (q: string, growthHabit?: string) =>
     request<Species[]>(`/species?q=${encodeURIComponent(q)}&limit=12${growthHabit ? `&growth_habit=${encodeURIComponent(growthHabit)}` : ""}`),
 
@@ -517,6 +544,7 @@ export const api = {
 export const exportUrl = {
   estimateXlsx: (id: string, pct = 15) => `${BASE}/projects/${id}/estimate.xlsx?contingency_pct=${pct}`,
   pdf: (id: string, pct = 15) => `${BASE}/projects/${id}/export/plan.pdf?contingency_pct=${pct}`,
+  masterPlanPdf: (id: string) => `${BASE}/projects/${id}/export/master-plan.pdf`,
   geojson: (id: string) => `${BASE}/projects/${id}/export/geojson`,
   shapefile: (id: string) => `${BASE}/projects/${id}/export/shapefile`,
   kml: (id: string) => `${BASE}/projects/${id}/export/kml`,
