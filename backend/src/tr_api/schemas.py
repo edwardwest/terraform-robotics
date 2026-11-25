@@ -462,3 +462,36 @@ class PlanFeature(BaseModel):
 class PlanFeatureCollection(BaseModel):
     type: Literal["FeatureCollection"] = "FeatureCollection"
     features: list[PlanFeature]
+
+
+# ---- Master plan sheet ------------------------------------------------------------------------------
+
+
+class PlanSheetSettings(BaseModel):
+    """How the master plan sheet is drawn. Label positions are fractions of the sheet's width and height, so they
+    survive a change of sheet size; keys are the label text (upper case) as drawn."""
+    model_config = ConfigDict(extra="forbid")
+    size: Literal["11x17", "24x36"] = "11x17"
+    title: str = Field(default="Master plan", max_length=60)
+    subtitle: str | None = Field(default=None, max_length=120)  # defaults to the project address
+    prepared_by: str = Field(default="", max_length=80)
+    notes: str = Field(default="", max_length=800)
+    base: Literal["aerial", "terrain", "plain"] = "aerial"
+    contours: bool = True
+    labels: Literal["callouts", "on_features", "off"] = "callouts"
+    phases: int = Field(default=0, ge=0, le=3)  # 0: all; n: phases 1 to n
+    show_existing: bool = True
+    hidden_categories: list[str] = Field(default_factory=list, max_length=20)
+    hidden_labels: list[str] = Field(default_factory=list, max_length=500)
+    label_positions: dict[str, tuple[float, float]] = Field(default_factory=dict)
+    schedule: bool = True
+
+    @field_validator("label_positions")
+    @classmethod
+    def _on_sheet(cls, v: dict[str, tuple[float, float]]) -> dict[str, tuple[float, float]]:
+        if len(v) > 500:
+            raise ValueError("Too many label positions")
+        for key, (x, y) in v.items():
+            if len(key) > 120 or not (0 <= x <= 1 and 0 <= y <= 1):
+                raise ValueError("Label positions are fractions of the sheet, from 0 to 1")
+        return v

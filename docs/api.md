@@ -140,6 +140,17 @@ What a person places on the map. Types, the fixed categories and their map color
 
 Exports include master plan features: GeoJSON (`kind: "plan_feature"`), Shapefile (`plan_points`, `plan_lines`, `plan_areas`), KML (a folder per category, styled in its color) and DXF (a `PLAN_<CATEGORY>` layer per category in use, with labels).
 
+## Master plan sheet
+
+An illustrated, print-ready plan of the master plan features (`tr_api.master_sheet`, one SVG renderer for both the preview and the PDF).
+
+`GET /api/projects/{id}/plan-sheet` → `PlanSheetSettings` (defaults when none are saved).
+`PUT /api/projects/{id}/plan-sheet` with the whole `PlanSheetSettings` → the saved settings. `PlanSheetSettings`: `{ size: "11x17"|"24x36", title, subtitle (null: the project address), prepared_by, notes, base: "aerial"|"terrain"|"plain", contours, labels: "callouts"|"on_features"|"off", phases: 0–3 (0 all; n phases 1 to n), show_existing, hidden_categories[], hidden_labels[], label_positions: { LABEL TEXT: [x, y] }, schedule }`. Label keys are the label text in upper case, as drawn; features with the same label share one callout. Positions are fractions of the sheet's width and height (the label's left edge and first baseline). Unknown fields, categories or positions outside 0–1 are `422`.
+`GET /api/projects/{id}/plan-sheet/svg` → the sheet as `image/svg+xml` from the saved settings (base image at ~110 dpi). Labels are `<g class="lbl" data-key data-x data-y>`. `X-Sheet-Base` says which base was drawn: `aerial` (USGS National Map imagery, faded), `terrain` (hillshade from the DEM: asked for, or the fallback when the imagery can't be reached), or `plain`.
+`GET /api/projects/{id}/export/master-plan.pdf` → the same sheet as a PDF (base image at ~200 dpi; `?inline=true` to show rather than download).
+
+The map is drawn north-up in the site's UTM zone at the next standard scale (1 in = N ft) that fits the property and every feature shown. Planted features draw tree symbols at their spacing (capped per feature and per sheet; the schedule's counts are the real ones).
+
 ## Design (Stage 2)
 
 Lines are computed by `tr_geo.design` from the terrain model. Designs on planning-grade terrain need `allow_planning: true` and are marked `draft`; coarse terrain is refused (`409`).
