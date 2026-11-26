@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --test src/lib/units.test.ts"
+    "test": "node --test src/lib/units.test.ts src/components/scene/sceneGeometry.test.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "7.9.19",
