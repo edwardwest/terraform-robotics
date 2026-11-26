@@ -90,6 +90,34 @@ def test_render_is_a_complete_sheet():
     assert 'width="2592pt"' in big and 'class="lbl"' not in big
 
 
+def test_pdf_keeps_the_base_photo_as_jpeg():
+    import io
+
+    import numpy as np
+    from pypdf import PdfReader
+
+    from tr_api.master_sheet import pdf_with_base
+
+    fs = [feat(1, "pond", sq(0, 0, 60)), feat(2, "apiary", Point(X0 + 80, Y0 + 20), "Hives")]
+    settings = {"size": "11x17", "labels": "callouts"}
+    inp = SheetInput("x", None, sq(-10, -10, 120), fs, pf.library()["categories"], settings)
+    frame = frame_for(settings, fs, inp.boundary)
+    rng = np.random.default_rng(1)
+    photo = np.kron(rng.integers(40, 220, (120, 160, 3)).astype(np.uint8), np.ones((8, 8, 1), dtype=np.uint8))
+    inp.base_jpeg, inp.base_bounds = basemap.jpeg_bytes(photo), frame.bounds_m()
+    pdf = pdf_with_base(inp)
+    page = PdfReader(io.BytesIO(pdf)).pages[0]
+    assert [round(v) for v in page.mediabox[2:]] == [1224, 792]
+    images = list(page.images)
+    assert len(images) == 1 and images[0].image.size == (1280, 960)
+    xobjs = page["/Resources"]["/XObject"]
+    filters = {str(xobjs[k].get_object().get("/Filter")) for k in xobjs}
+    assert "/DCTDecode" in "".join(filters)  # embedded as JPEG, not re-encoded
+    assert len(pdf) < len(inp.base_jpeg) * 1.5 + 200_000
+    text = page.extract_text()
+    assert "HIVES" in text and "Master plan" in text  # the vector drawing is on top
+
+
 def test_frame_fits_everything():
     fs = [feat(1, "pond", sq(0, 0, 400, 100))]
     f = frame_for({"size": "11x17"}, fs, None)

@@ -20,7 +20,7 @@ from . import basemap, schemas
 from .auth import CurrentUser
 from .common import _project_or_404, dem_local_path
 from .db import execute, fetch_all, fetch_one
-from .master_sheet import SheetFeature, SheetInput, frame_for, render
+from .master_sheet import SheetFeature, SheetInput, frame_for, pdf_with_base, render
 from .plan_features_api import feature_rows
 
 log = logging.getLogger(__name__)
@@ -142,14 +142,12 @@ def sheet_svg(project_id: UUID, user: CurrentUser):
 
 @router.get("/api/projects/{project_id}/export/master-plan.pdf")
 def sheet_pdf(project_id: UUID, user: CurrentUser, inline: bool = Query(False)):
-    """The sheet as a print PDF (base image ~200 dpi)."""
-    import cairosvg
-
+    """The sheet as a print PDF (base image ~200 dpi, kept as JPEG)."""
     from .outputs import _download, _slug
 
     project = _project_or_404(project_id, user)
     inp, _ = _sheet_input(project_id, user, load_settings(project_id), PDF_DPI)
-    pdf = cairosvg.svg2pdf(bytestring=render(inp).encode("utf-8"))
+    pdf = pdf_with_base(inp)
     if inline:
         return Response(pdf, media_type="application/pdf")
     return _download(pdf, f"{_slug(project['name'])}-master-plan.pdf", "application/pdf")
