@@ -507,8 +507,19 @@ class Wind(BaseModel):
     from_deg: float = Field(ge=0, lt=360)  # the direction the wind comes FROM, degrees clockwise from north
 
 
+class Camera(BaseModel):
+    """A fly-through camera point (MapLibre camera)."""
+    model_config = ConfigDict(extra="forbid")
+    center: tuple[float, float]  # lon, lat
+    zoom: float = Field(ge=1, le=22)
+    pitch: float = Field(ge=0, le=85)
+    bearing: float = Field(ge=-360, le=360)
+    duration_s: float = Field(default=6, ge=1, le=30)  # time to fly here from the previous point
+
+
 class PlanSiteSettings(BaseModel):
-    """Zones 1-4 (distance out from the house, metres), winds and fire direction, and which overlays the map shows."""
+    """Zones 1-4 (distance out from the house, metres), winds and fire direction, which overlays the map shows,
+    the year each build phase starts (for the 3D view's year slider), and the fly-through camera path."""
     model_config = ConfigDict(extra="forbid")
     # 50, 150, 400 and 1,000 ft
     zone_radii_m: list[float] = Field(default_factory=lambda: [15.24, 45.72, 121.92, 304.8], min_length=4, max_length=4)
@@ -517,6 +528,15 @@ class PlanSiteSettings(BaseModel):
     fire_from_deg: float | None = Field(default=None, ge=0, lt=360)
     show_zones: bool = False
     show_sectors: bool = False
+    phase_years: list[int] = Field(default_factory=lambda: [0, 2, 4], min_length=3, max_length=3)
+    flight: list[Camera] = Field(default_factory=list, max_length=12)
+
+    @field_validator("phase_years")
+    @classmethod
+    def _phases_in_order(cls, v: list[int]) -> list[int]:
+        if any(y < 0 or y > 50 for y in v) or any(b < a for a, b in zip(v, v[1:])):
+            raise ValueError("Phase start years run from phase 1 to 3, each between 0 and 50")
+        return v
 
     @field_validator("zone_radii_m")
     @classmethod

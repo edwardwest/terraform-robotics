@@ -576,6 +576,9 @@ export function MasterPlanView({ projectId }: { projectId: string }) {
           <Link href={`/projects/${projectId}/sheet`} className="btn">
             Master plan sheet <IconArrowRight />
           </Link>
+          <Link href={`/projects/${projectId}/scene`} className="btn">
+            3D view and fly-through <IconArrowRight />
+          </Link>
           <Link href={`/projects/${projectId}/estimate`} className="btn btn-primary">
             Review estimate <IconArrowRight />
           </Link>

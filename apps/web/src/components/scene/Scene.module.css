@@ -1,0 +1,144 @@
+/* 3D view: settings on the left, the scene fills the rest. */
+.layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-4);
+  height: calc(100vh - var(--header-h, 72px));
+  box-sizing: border-box;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+  padding-right: var(--space-1);
+  min-height: 0;
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg-2);
+  text-decoration: none;
+  margin-bottom: var(--space-1);
+}
+
+.back:hover {
+  color: var(--fg-1);
+}
+
+.group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.group legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+}
+
+.range {
+  width: 100%;
+  accent-color: var(--white);
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--fg-3);
+}
+
+.phases {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.phase {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.views {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.linkBtn {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--fg-1);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: var(--white);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.mapCol {
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .mapCol {
+    height: 70vh;
+  }
+}

@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
-from shapely import wkb
+from shapely import affinity, wkb
 from shapely.geometry import LineString, Point, mapping
 
 from tr_geo import design as geo
@@ -239,3 +240,120 @@ def checks(project_id: UUID, user: CurrentUser):
     winds = load_site(project_id)["winds"]
     found = pc.run_checks(feats, boundary, surface, winds)
     return {"findings": [f.as_dict() for f in found], "terrain": surface is not None}
+
+
+# ---- 3D scene ---------------------------------------------------------------------------------------
+
+MAX_SCENE_TREES = 6000
+WOODLAND_TYPES = {"existing-forest"}  # natural woodland: scattered trees, not rows
+BUILDING_COLORS = {"house": "#a35454", "barn": "#8c4a4a", "shed": "#7a5a42", "high-tunnel": "#d5dde0"}
+TREE_COLORS = {"orchard": "#6f9a4a", "food-forest": "#5f8a3e", "berries": "#7a9a4e", "shade-tree": "#55784f",
+               "windbreak": "#3d5e3a", "hedgerow": "#4f6e44", "riparian": "#4f7f56", "existing-forest": "#3f5c40"}
+
+
+@router.get("/api/projects/{project_id}/plan-scene")
+def scene(project_id: UUID, user: CurrentUser):
+    """What the 3D view draws, in EPSG:4326, with the year each thing appears: buildings (footprint, height, roof),
+    trees (position, mature height and canopy, years to full size; natural woodland as scattered trees), and
+    ground areas. Sizes over time are estimates from USDA PLANTS growth rates and typical sizes (tr_kb.growth)."""
+    from tr_kb import growth
+
+    _project_or_404(project_id, user)
+    site = load_site(project_id)
+    phase_year = dict(zip((1, 2, 3), site["phase_years"]))
+    srid, surface, _ = site_frame(project_id)
+    pairs = features_in(project_id, srid)
+    types = pf.types_by_id()
+    colors = {c["id"]: c["color"] for c in pf.library()["categories"]}
+
+    def year_of(r: dict) -> int:
+        return -100 if r["status"] == "existing" else phase_year.get(int(r["build_phase"]), 0)
+
+    symbols = sorted({sp["symbol"] for r, _ in pairs for sp in (r["props"] or {}).get("species") or []})
+    traits = {row["symbol"]: row["traits"] or {} for row in fetch_all(
+        "SELECT symbol, traits FROM species WHERE symbol = ANY(:s)", s=symbols)} if symbols else {}
+
+    buildings, areas = [], []
+    for r, g in pairs:
+        t = types[r["type"]]
+        base = {"id": str(r["id"]), "type": r["type"], "label": r["label"], "year": year_of(r), "status": r["status"]}
+        if "building" in t["fields"] and g.geom_type == "Polygon":
+            h = float((r["props"] or {}).get("height_m") or t["defaults"].get("height_m") or 4)
+            roof = (r["props"] or {}).get("roof") or t["defaults"].get("roof") or "gable"
+            ridge = 0 if roof == "flat" else min(h * 0.35, 4.0)
+            wall = h - ridge
+            buildings.append({"type": "Feature", "geometry": mapping(_ll(g, srid)),
+                              "properties": {**base, "height_m": round(wall, 2), "part": "walls",
+                                             "color": BUILDING_COLORS.get(r["type"], "#a35454")}})
+            if ridge:
+                # A narrower block along the long axis reads as a gable or hip roof at site scale.
+                mrr = g.minimum_rotated_rectangle
+                xs = list(mrr.exterior.coords)[:4]
+                e1 = LineString([xs[0], xs[1]]).length
+                e2 = LineString([xs[1], xs[2]]).length
+                shrink = (0.5, 0.92) if roof in ("gable", "shed") else (0.5, 0.6)
+                (ax, ay), (bx, by) = (xs[0], xs[1]) if e1 >= e2 else (xs[1], xs[2])
+                ang = math.degrees(math.atan2(by - ay, bx - ax))
+                cap = affinity.rotate(mrr, -ang, origin="centroid")
+                cap = affinity.scale(cap, xfact=shrink[1], yfact=shrink[0], origin="centroid")
+                cap = affinity.rotate(cap, ang, origin="centroid")
+                buildings.append({"type": "Feature", "geometry": mapping(_ll(cap, srid)),
+                                  "properties": {**base, "base_m": round(wall, 2), "height_m": round(h, 2), "part": "roof",
+                                                 "color": "#6f6d68" if r["type"] != "high-tunnel" else "#c6cfd1"}})
+        elif g.geom_type == "Polygon":
+            areas.append({"type": "Feature", "geometry": mapping(_ll(g, srid)),
+                          "properties": {**base, "category": r["category"], "color": colors.get(r["category"], "#888888")}})
+
+    lays = planting_layout(project_id, srid, surface, pairs)
+    groups = []  # (row, points in the projected CRS)
+    for v in lays.values():
+        if v["row"]["type"] not in WOODLAND_TYPES:
+            groups.append((v["row"], list(v["layout"].points)))
+    for r, g in pairs:
+        if r["type"] in WOODLAND_TYPES and g.geom_type == "Polygon":
+            sp_traits = [traits[s["symbol"]] for s in (r["props"] or {}).get("species") or [] if s["symbol"] in traits]
+            _, c, _ = growth.mature_size(r["type"], r["props"] or {}, sp_traits, types[r["type"]]["defaults"])
+            groups.append((r, scatter(g, spacing=max(c * 0.8, 3.0), seed=str(r["id"]))))
+    total = sum(len(pts) for _, pts in groups) or 1
+    step = max(1, -(-total // MAX_SCENE_TREES))  # ceil: thin evenly when over the budget
+    trees, kinds = [], []
+    for r, pts in groups:
+        sp_traits = [traits[s["symbol"]] for s in (r["props"] or {}).get("species") or [] if s["symbol"] in traits]
+        h, c, yrs = growth.mature_size(r["type"], r["props"] or {}, sp_traits, types[r["type"]]["defaults"])
+        if r["type"] not in kinds:
+            kinds.append(r["type"])
+        k = kinds.index(r["type"])
+        y = year_of(r)
+        for x, yy in pts[::step]:
+            q = _ll(Point(x, yy), srid)
+            trees.append([round(q.x, 7), round(q.y, 7), h, c, yrs, y, k])
+    return {
+        "phase_years": site["phase_years"],
+        "buildings": {"type": "FeatureCollection", "features": buildings},
+        "areas": {"type": "FeatureCollection", "features": areas},
+        # [lon, lat, mature height m, canopy diameter m, years to full size, year planted, kind index]
+        "trees": trees,
+        "tree_kinds": [{"type": k, "color": TREE_COLORS.get(k, "#5f8a3e")} for k in kinds],
+        "trees_thinned": step > 1,
+        "terrain": surface is not None,
+    }
+
+
+def scatter(poly, spacing: float, seed: str) -> list[tuple[float, float]]:
+    """Points filling a polygon like natural woodland: a grid at `spacing` with each point nudged up to 40% of the
+    spacing, repeatable for the same feature (seeded by its id). Projected CRS, metres."""
+    import random
+
+    rnd = random.Random(seed)
+    x0, y0, x1, y1 = poly.bounds
+    pts = []
+    y = y0 + spacing / 2
+    while y < y1:
+        x = x0 + spacing / 2
+        while x < x1:
+            p = (x + rnd.uniform(-0.4, 0.4) * spacing, y + rnd.uniform(-0.4, 0.4) * spacing)
+            if poly.contains(Point(p)):
+                pts.append(p)
+            x += spacing
+        y += spacing
+    return pts

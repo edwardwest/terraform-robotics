@@ -330,6 +330,30 @@ export interface PlanSiteSettings {
   fire_from_deg: number | null;
   show_zones: boolean;
   show_sectors: boolean;
+  /** Year each build phase (1-3) starts, for the 3D view's year slider. */
+  phase_years: [number, number, number];
+  /** Fly-through camera path (up to 12 points). */
+  flight: Camera[];
+}
+export interface Camera {
+  center: [number, number];
+  zoom: number;
+  pitch: number;
+  bearing: number;
+  /** Seconds to fly here from the previous point. */
+  duration_s: number;
+}
+export interface SceneProps { id: string; type: string; label: string | null; year: number; status: string; color: string }
+/** [lon, lat, mature height m, canopy diameter m, years to full size, year planted, kind index] */
+export type SceneTree = [number, number, number, number, number, number, number];
+export interface PlanScene {
+  phase_years: [number, number, number];
+  buildings: FeatureCollection<Polygon, SceneProps & { part: "walls" | "roof"; height_m: number; base_m?: number }>;
+  areas: FeatureCollection<Polygon, SceneProps & { category: string }>;
+  trees: SceneTree[];
+  tree_kinds: { type: string; color: string }[];
+  trees_thinned: boolean;
+  terrain: boolean;
 }
 export interface SunTimes { rise: number; set: number; noon_altitude: number }
 export interface PlanSite {
@@ -564,6 +588,7 @@ export const api = {
   getPlanting: (id: string) => request<PlantingCollection>(`/projects/${id}/plan-features/planting`),
   contourLine: (id: string, start: [number, number], end: [number, number]) =>
     request<ContourLine>(`/projects/${id}/plan-features/contour-line`, { method: "POST", body: JSON.stringify({ start, end }) }),
+  getPlanScene: (id: string) => request<PlanScene>(`/projects/${id}/plan-scene`),
   getPlanSite: (id: string) => request<PlanSite>(`/projects/${id}/plan-site`),
   putPlanSite: (id: string, body: PlanSiteSettings) =>
     request<PlanSite>(`/projects/${id}/plan-site`, { method: "PUT", body: JSON.stringify(body) }),

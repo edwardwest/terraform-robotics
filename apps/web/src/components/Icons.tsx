@@ -41,4 +41,7 @@ export const IconMountain = (p: P) => (<Svg {...p}><path d="m8 3 4 8 5-5 5 15H2L
 export const IconRuler = (p: P) => (<Svg {...p}><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0Z" /><path d="m14.5 12.5 2-2M11.5 9.5l2-2M8.5 6.5l2-2M17.5 15.5l2-2" /></Svg>);
 export const IconRotate3d = (p: P) => (<Svg {...p}><path d="M16.5 6.5c3 1 5 2.6 5 4.5 0 3-5.6 5.5-12.5 5.5" /><path d="m6 14 3.5 2.5L6 19" /><path d="M12 3c-1.9 0-3.5 4-3.5 9 0 1.3.1 2.6.4 3.7" /><path d="M2.5 11c0-1.9 2-3.5 5-4.5" /></Svg>);
 export const IconAlert = (p: P) => (<Svg {...p}><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></Svg>);
+export const IconPlay = (p: P) => (<Svg {...p}><path d="M7 4v16l13-8Z" /></Svg>);
+export const IconStop = (p: P) => (<Svg {...p}><rect x="6" y="6" width="12" height="12" rx="1" /></Svg>);
+export const IconRecord = (p: P) => (<Svg {...p}><circle cx="12" cy="12" r="6" /></Svg>);
 export const IconX = (p: P) => (<Svg {...p}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Svg>);
