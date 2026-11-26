@@ -231,6 +231,8 @@ def _allowed_keys(ftype: dict) -> set[str]:
     keys = {"notes"}
     if "species" in ftype["fields"]:
         keys |= {"species", "plant_spacing_m", "row_spacing_m", "rows", "height_m"}
+        if ftype["geometry"] == "polygon":
+            keys.add("rows_pattern")
     if "building" in ftype["fields"]:
         keys |= {"height_m", "roof"}
     if "capacity" in ftype["fields"]:

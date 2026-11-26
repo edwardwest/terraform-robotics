@@ -8,8 +8,8 @@ import { useMap } from "@/lib/useMap";
 import { emptyFC, polygonFeature } from "@/lib/geo";
 import { IconMap, IconMinus, IconPlus, IconRotate3d, IconRuler } from "../Icons";
 import {
-  analysisLayers, boundaryLayers, DESIGN_CLICK_LAYERS, designLayers, LAYER_IDS, PLAN_CLICK_LAYERS, planLayers, previewLayers,
-  sectionLayers, type ToggleKey,
+  analysisLayers, boundaryLayers, DESIGN_CLICK_LAYERS, designLayers, LAYER_IDS, PLAN_CLICK_LAYERS, planLayers, plantingLayers,
+  previewLayers, sectionLayers, siteLayers, type ToggleKey,
 } from "./layers";
 import styles from "./TerrainMap.module.css";
 
@@ -45,6 +45,10 @@ interface Props {
   onSelectPlanFeature?: ((id: string | null) => void) | null;
   /** The MapLibre map once its style has loaded (null on teardown), for tools that draw on it. */
   onMapReady?: (map: MLMap | null) => void;
+  /** Planting layouts (rows and plants) of master plan features. */
+  planting?: FeatureCollection | null;
+  /** Zone rings and sector wedges. */
+  siteOverlays?: FeatureCollection | null;
 }
 
 /** Mark the highest-order streams as main flow. */
@@ -84,6 +88,8 @@ export function TerrainMap({
   selectedPlanFeature = null,
   onSelectPlanFeature = null,
   onMapReady,
+  planting = null,
+  siteOverlays = null,
 }: Props) {
   const { containerRef, map, error } = useMap();
   const [pitched, setPitched] = useState(false);
@@ -108,10 +114,10 @@ export function TerrainMap({
   // Sources and layers, added once.
   useEffect(() => {
     if (!map) return;
-    for (const id of ["boundary", "contours", "flow", "valleys", "ridges", "section", "design", "pending", "preview", "plan"]) {
+    for (const id of ["boundary", "contours", "flow", "valleys", "ridges", "section", "design", "pending", "preview", "plan", "planting", "site"]) {
       if (!map.getSource(id)) map.addSource(id, { type: "geojson", data: emptyFC() });
     }
-    for (const l of [...analysisLayers, ...boundaryLayers, ...planLayers, ...designLayers, ...previewLayers, ...sectionLayers]) {
+    for (const l of [...analysisLayers, ...siteLayers, ...boundaryLayers, ...planLayers, ...plantingLayers, ...designLayers, ...previewLayers, ...sectionLayers]) {
       if (!map.getLayer(l.id)) map.addLayer(l);
     }
     const click = (e: { lngLat: { lng: number; lat: number }; point: { x: number; y: number } }) => {
@@ -169,10 +175,18 @@ export function TerrainMap({
     if (map?.getLayer("design-selected")) map.setFilter("design-selected", ["==", ["get", "id"], selectedElement ?? "__none__"]);
   }, [map, selectedElement]);
 
-  // Master plan features.
+  // Master plan features, their planting layouts, and zone and sector overlays.
   useEffect(() => {
     (map?.getSource("plan") as GeoJSONSource | undefined)?.setData(planFeatures ?? emptyFC());
   }, [map, planFeatures]);
+
+  useEffect(() => {
+    (map?.getSource("planting") as GeoJSONSource | undefined)?.setData(planting ?? emptyFC());
+  }, [map, planting]);
+
+  useEffect(() => {
+    (map?.getSource("site") as GeoJSONSource | undefined)?.setData(siteOverlays ?? emptyFC());
+  }, [map, siteOverlays]);
 
   useEffect(() => {
     if (!map) return;

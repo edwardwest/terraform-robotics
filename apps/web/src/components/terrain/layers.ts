@@ -256,3 +256,63 @@ export const planLayers: LayerSpecification[] = [
     paint: { "circle-radius": 10, "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 },
   },
 ];
+
+/** Planting layouts: rows faint, plants as small dots in their category's color. Shown from neighbourhood zoom in. */
+export const plantingLayers: LayerSpecification[] = [
+  {
+    id: "planting-rows",
+    type: "line",
+    source: "planting",
+    minzoom: 15,
+    filter: ["==", ["get", "kind"], "row"],
+    paint: { "line-color": ["get", "color"], "line-width": 0.75, "line-opacity": 0.6 },
+  },
+  {
+    id: "planting-plants",
+    type: "circle",
+    source: "planting",
+    minzoom: 15,
+    filter: ["==", ["get", "kind"], "plant"],
+    paint: {
+      "circle-color": ["get", "color"],
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 1.2, 18, 3.5, 20, 6],
+      "circle-stroke-color": "#000000",
+      "circle-stroke-width": 0.5,
+    },
+  },
+];
+
+/**
+ * Zones and sectors (reference overlays, drawn under the plan). Monochrome like the rest of the interface except
+ * sectors: sun in a warm white, wind in pale blue-grey, fire in the fire category's orange.
+ */
+export const siteLayers: LayerSpecification[] = [
+  {
+    id: "site-sector-fill",
+    type: "fill",
+    source: "site",
+    filter: ["!=", ["get", "kind"], "zone"],
+    paint: {
+      "fill-color": ["match", ["get", "kind"], "sun", "#f3e6b3", "wind", "#a9c1d6", "fire", "#e0703a", "#ffffff"],
+      "fill-opacity": ["match", ["get", "kind"], "sun", 0.12, 0.16],
+    },
+  },
+  {
+    id: "site-sector-line",
+    type: "line",
+    source: "site",
+    filter: ["!=", ["get", "kind"], "zone"],
+    paint: {
+      "line-color": ["match", ["get", "kind"], "sun", "#f3e6b3", "wind", "#a9c1d6", "fire", "#e0703a", "#ffffff"],
+      "line-width": 1,
+      "line-opacity": 0.7,
+    },
+  },
+  {
+    id: "site-zone-line",
+    type: "line",
+    source: "site",
+    filter: ["==", ["get", "kind"], "zone"],
+    paint: { "line-color": "#ffffff", "line-width": 1, "line-opacity": 0.55, "line-dasharray": [4, 3] },
+  },
+];

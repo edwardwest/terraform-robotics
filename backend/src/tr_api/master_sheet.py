@@ -54,6 +54,7 @@ class SheetFeature:
     geom: Point | LineString | Polygon
     props: dict = field(default_factory=dict)
     plant_count: int | None = None
+    plant_points: list[tuple[float, float]] | None = None  # the planting layout's positions (UTM), when computed
 
 
 @dataclass
@@ -251,6 +252,10 @@ def tree_points(f: SheetFeature, st: Style, budget: int) -> tuple[list[tuple[flo
     if g.geom_type == "Point":
         return [(g.x, g.y)], canopy
     cap = max(1, min(MAX_TREES_PER_FEATURE, budget))
+    if f.plant_points:
+        pts = f.plant_points
+        step = max(1, math.ceil(len(pts) / cap))
+        return list(pts[::step]), min(canopy, plant * 0.62) if g.geom_type == "LineString" else min(canopy, min(plant, row) * 0.62)
     if g.geom_type == "LineString":
         rows = int(p.get("rows") or 1)
         n = max(1, int(g.length // plant) + 1)

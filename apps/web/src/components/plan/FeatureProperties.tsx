@@ -3,9 +3,12 @@
 // type takes (species and spacing, building height and roof, storage capacity). Inputs are in feet and gallons;
 // the API stores metres and cubic metres.
 import { useEffect, useMemo, useState } from "react";
-import { api, type PlanFeature, type PlanFeatureSettings, type PlanFeatureUpdate, type PlanLibrary, type Roof, type Species, type SpeciesRef } from "@/lib/api";
+import {
+  api, type PlanFeature, type PlanFeatureSettings, type PlanFeatureUpdate, type PlanFinding, type PlanLibrary, type PlantingSummary,
+  type Roof, type Species, type SpeciesRef,
+} from "@/lib/api";
 import { ftToM, galToM3, m3ToGal } from "@/lib/units";
-import { IconPencil, IconX } from "../Icons";
+import { IconAlert, IconPencil, IconX } from "../Icons";
 import tv from "../terrain/TerrainView.module.css";
 import { feetValue, formatArea, formatLength } from "./format";
 import styles from "./MasterPlan.module.css";
@@ -20,6 +23,9 @@ interface Props {
   onEditShape: () => void;
   onClose: () => void;
   editingShape: boolean;
+  planting: PlantingSummary | null;
+  findings: PlanFinding[];
+  hasTerrain: boolean;
 }
 
 /** Parse a feet input to metres; empty is null, anything else unparseable is an error. */
@@ -29,7 +35,7 @@ function feetToM(v: string): number | null | "bad" {
   return Number.isFinite(n) && n > 0 ? Math.round(ftToM(n) * 100) / 100 : "bad";
 }
 
-export function FeatureProperties({ feature, library, onSave, onDelete, onEditShape, onClose, editingShape }: Props) {
+export function FeatureProperties({ feature, library, onSave, onDelete, onEditShape, onClose, editingShape, planting, findings, hasTerrain }: Props) {
   const p = feature.properties;
   const type = library.types.find((t) => t.id === p.type)!;
   const category = library.categories.find((c) => c.id === p.category);
@@ -48,6 +54,7 @@ export function FeatureProperties({ feature, library, onSave, onDelete, onEditSh
   const [roof, setRoof] = useState<Roof | undefined>(p.props.roof);
   const [gallons, setGallons] = useState(p.props.capacity_m3 ? String(Math.round(m3ToGal(p.props.capacity_m3))) : "");
   const [notes, setNotes] = useState(p.props.notes ?? "");
+  const [rowsPattern, setRowsPattern] = useState<"straight" | "contour">(p.props.rows_pattern ?? "straight");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +76,7 @@ export function FeatureProperties({ feature, library, onSave, onDelete, onEditSh
     const props: Partial<PlanFeatureSettings> = {};
     if (fields.has("species")) {
       props.species = species;
+      if (type.geometry === "polygon") props.rows_pattern = rowsPattern;
       for (const [key, v, show] of [
         ["plant_spacing_m", plantFt, type.geometry !== "point"],
         ["row_spacing_m", rowFt, type.geometry === "polygon"],
@@ -120,8 +128,26 @@ export function FeatureProperties({ feature, library, onSave, onDelete, onEditSh
         {p.area_m2 != null && <div><dt className="app-small">Area</dt><dd>{formatArea(p.area_m2)}</dd></div>}
         {p.perimeter_m != null && <div><dt className="app-small">Edge</dt><dd>{formatLength(p.perimeter_m)}</dd></div>}
         {p.length_m != null && <div><dt className="app-small">Length</dt><dd>{formatLength(p.length_m)}</dd></div>}
-        {p.plant_count != null && <div><dt className="app-small">Plants</dt><dd>{p.plant_count.toLocaleString("en-US")}</dd></div>}
+        {(planting?.plants ?? p.plant_count) != null && (
+          <div><dt className="app-small">Plants</dt><dd>{(planting?.plants ?? p.plant_count)!.toLocaleString("en-US")}</dd></div>
+        )}
       </dl>
+      )}
+      {planting && planting.rows > 0 && (
+        <p className="app-small">
+          {planting.plants.toLocaleString("en-US")} plants in {planting.rows} row{planting.rows === 1 ? "" : "s"}
+          {planting.pattern === "contour" ? " on contour" : ""}.{planting.note ? ` ${planting.note}` : ""}
+        </p>
+      )}
+      {findings.length > 0 && (
+        <ul className={styles.checkList} aria-label="Checks for this feature">
+          {findings.map((f, i) => (
+            <li key={`${f.rule}-${i}`} className={styles.inlineCheck}>
+              <span className={styles.checkHead}>{f.severity === "warning" && <IconAlert size={14} />}<span className={styles.itemTitle}>{f.title}</span></span>
+              <span className="app-small">{f.message}</span>
+            </li>
+          ))}
+        </ul>
       )}
       {p.intervention && p.status === "proposed" && type.intervention_title && (
         <p className="app-small">Counts toward {type.intervention_title.toLowerCase()} in your plan and estimate.</p>
@@ -172,6 +198,22 @@ export function FeatureProperties({ feature, library, onSave, onDelete, onEditSh
           {fields.has("species") && (
             <>
               <SpeciesPicker value={species} onChange={setSpecies} />
+              {type.geometry === "polygon" && (
+                <fieldset className={styles.group}>
+                  <legend className="field-label">Rows</legend>
+                  <div className={styles.chips}>
+                    <button type="button" className="chip" aria-pressed={rowsPattern === "straight"} onClick={() => setRowsPattern("straight")}>Straight</button>
+                    <button type="button" className="chip" aria-pressed={rowsPattern === "contour"} onClick={() => setRowsPattern("contour")}>On contour</button>
+                  </div>
+                  {rowsPattern === "contour" && (
+                    <p className="app-small">
+                      {hasTerrain
+                        ? "Rows run parallel to the contour through the middle of the area, as in keyline orchards, so they slow and spread water across the slope."
+                        : "Needs a terrain model; until there is one, rows run straight."}
+                    </p>
+                  )}
+                </fieldset>
+              )}
               <div className={styles.settings}>
                 {type.geometry === "polygon" && (
                   <div className="field">
