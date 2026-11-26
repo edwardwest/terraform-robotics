@@ -65,7 +65,7 @@ class SheetInput:
     categories: list[dict]              # library categories (id, label, color)
     settings: dict
     contours: list[LineString] = field(default_factory=list)  # UTM
-    base_png: bytes | None = None       # RGB image covering `base_bounds`
+    base_jpeg: bytes | None = None      # RGB image (JPEG) covering `base_bounds`
     base_bounds: tuple[float, float, float, float] | None = None
     base_credit: str | None = None
     today: date = field(default_factory=date.today)
@@ -376,12 +376,12 @@ def render(inp: SheetInput) -> str:
     ]
 
     # Base: photo or shading, else plain sage.
-    if inp.base_png and inp.base_bounds:
+    if inp.base_jpeg and inp.base_bounds:
         bx0, by0, bx1, by1 = inp.base_bounds
         (ix0, iy0), (ix1, iy1) = frame.pt(bx0, by1), frame.pt(bx1, by0)
-        b64 = base64.b64encode(inp.base_png).decode()
+        b64 = base64.b64encode(inp.base_jpeg).decode()
         out.append(f'<image x="{ix0:.1f}" y="{iy0:.1f}" width="{ix1 - ix0:.1f}" height="{iy1 - iy0:.1f}" '
-                   f'preserveAspectRatio="none" xlink:href="data:image/png;base64,{b64}"/>')
+                   f'preserveAspectRatio="none" xlink:href="data:image/jpeg;base64,{b64}"/>')
     else:
         out.append(f'<rect x="{fx0:.1f}" y="{fy0:.1f}" width="{fx1 - fx0:.1f}" height="{fy1 - fy0:.1f}" fill="#a9b39c"/>')
 
@@ -610,7 +610,7 @@ def _panel(inp: SheetInput, frame: Frame, W: float, H: float, k: float, m: float
     y += 50 * k
 
     # Title block, bottom-up.
-    tb_h = 132 * k
+    tb_h = 146 * k
     tb_y = H - m - tb_h
     notes = (s.get("notes") or "").strip()
 
@@ -649,9 +649,9 @@ def _panel(inp: SheetInput, frame: Frame, W: float, H: float, k: float, m: float
     for line in [ln for ln in meta if ln]:
         out.append(_text(x + 10 * k, ty, line, 7.6 * k, fill=INK_2))
         ty += 10.5 * k
-    out.append(_text(x + pw - 10 * k, tb_y + tb_h - 9 * k, "Concept plan. Not for construction.", 7 * k, fill="#993c1d", anchor="end"))
     credit = "Terraform Robotics" + (f" · {inp.base_credit}" if inp.base_credit else "")
-    out.append(_text(x + 10 * k, tb_y + tb_h - 9 * k, credit, 6.6 * k, fill="#888780"))
+    out.append(_text(x + 10 * k, tb_y + tb_h - 21 * k, credit, 6.6 * k, fill="#888780"))
+    out.append(_text(x + 10 * k, tb_y + tb_h - 9 * k, "Concept plan. Not for construction.", 7 * k, fill="#993c1d"))
     return "".join(out)
 
 

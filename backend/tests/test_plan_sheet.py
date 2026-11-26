@@ -192,7 +192,7 @@ def test_terrain_shading_when_no_aerial(client, tmp_path_factory, no_network):
     r = client.get(f"/api/projects/{pid}/plan-sheet/svg")
     assert r.headers["x-sheet-base"] == "terrain"  # aerial asked for, unreachable: terrain shading instead
     svg = r.text
-    assert "<image " in svg and "data:image/png;base64," in svg  # hillshade under the plan
+    assert "<image " in svg and "data:image/jpeg;base64," in svg  # hillshade under the plan
     assert 'stroke="#6f7a62"' in svg  # contours
     s = client.get(f"/api/projects/{pid}/plan-sheet").json()
     client.put(f"/api/projects/{pid}/plan-sheet", json={**s, "base": "plain", "contours": False})
