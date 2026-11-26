@@ -355,7 +355,9 @@ def frame_for(settings: dict, features: list[SheetFeature], boundary: Polygon | 
     return Frame(fx0, fy0, fx1, fy1, (minx + maxx) / 2, (miny + maxy) / 2, ft_in * FT / 72, ft_in)
 
 
-def render(inp: SheetInput) -> str:
+def render(inp: SheetInput, overlay: bool = False) -> str:
+    """The sheet as SVG. With `overlay`, the paper and base image are left out (transparent) so the drawing can be
+    laid over a page that already has them: the PDF does this to keep the photo as JPEG (see pdf_with_base)."""
     s = inp.settings
     W, H = SIZES[s.get("size", "11x17")]
     k = W / 1224
@@ -371,12 +373,14 @@ def render(inp: SheetInput) -> str:
         f'viewBox="0 0 {W:.0f} {H:.0f}" font-family="{FONT}">',
         _defs(k),
         f'<clipPath id="map"><rect x="{fx0:.1f}" y="{fy0:.1f}" width="{fx1 - fx0:.1f}" height="{fy1 - fy0:.1f}"/></clipPath>',
-        f'<rect width="{W:.0f}" height="{H:.0f}" fill="{PAPER}"/>',
+        "" if overlay else f'<rect width="{W:.0f}" height="{H:.0f}" fill="{PAPER}"/>',
         '<g clip-path="url(#map)">',
     ]
 
     # Base: photo or shading, else plain sage.
-    if inp.base_jpeg and inp.base_bounds:
+    if overlay and inp.base_jpeg and inp.base_bounds:
+        pass  # drawn on the page underneath
+    elif inp.base_jpeg and inp.base_bounds:
         bx0, by0, bx1, by1 = inp.base_bounds
         (ix0, iy0), (ix1, iy1) = frame.pt(bx0, by1), frame.pt(bx1, by0)
         b64 = base64.b64encode(inp.base_jpeg).decode()
@@ -440,6 +444,42 @@ def render(inp: SheetInput) -> str:
     out.append(_panel(inp, frame, W, H, k, m, panel, colors))
     out.append("</svg>")
     return "".join(out)
+
+
+def pdf_with_base(inp: SheetInput) -> bytes:
+    """The sheet as PDF. cairosvg re-encodes embedded images losslessly (an aerial photo makes a 6+ MB file), so the
+    paper and the JPEG base go on a page drawn by reportlab, which embeds JPEG as is, and the vector drawing is
+    laid over it."""
+    import io
+
+    import cairosvg
+    from pypdf import PdfReader, PdfWriter
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
+    if not (inp.base_jpeg and inp.base_bounds):
+        return cairosvg.svg2pdf(bytestring=render(inp).encode("utf-8"))
+    W, H = SIZES[inp.settings.get("size", "11x17")]
+    frame = frame_for(inp.settings, inp.features, inp.boundary)
+    bx0, by0, bx1, by1 = inp.base_bounds
+    (ix0, iy0), (ix1, iy1) = frame.pt(bx0, by1), frame.pt(bx1, by0)
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(W, H))
+    c.setFillColor(PAPER)
+    c.rect(0, 0, W, H, stroke=0, fill=1)
+    p = c.beginPath()
+    p.rect(frame.x0, H - frame.y1, frame.x1 - frame.x0, frame.y1 - frame.y0)
+    c.clipPath(p, stroke=0, fill=0)
+    c.drawImage(ImageReader(io.BytesIO(inp.base_jpeg)), ix0, H - iy1, ix1 - ix0, iy1 - iy0)
+    c.showPage()
+    c.save()
+    out = PdfWriter(clone_from=PdfReader(io.BytesIO(buf.getvalue())))
+    over = PdfReader(io.BytesIO(cairosvg.svg2pdf(bytestring=render(inp, overlay=True).encode("utf-8")))).pages[0]
+    out.pages[0].merge_page(over)
+    out.compress_identical_objects()
+    res = io.BytesIO()
+    out.write(res)
+    return res.getvalue()
 
 
 def _dash(d: str, k: float) -> str:
