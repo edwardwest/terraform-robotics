@@ -30,6 +30,7 @@ dependencies = [
   "pyyaml>=6.0",
   "pypdf>=5.0",
   "cairosvg>=2.7",
+  "pillow>=10.0",
   "fonttools>=4.50",
   "anthropic[vertex]>=0.70",
   "google-auth>=2.30",

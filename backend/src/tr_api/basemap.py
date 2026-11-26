@@ -141,6 +141,17 @@ def aerial(crs: str, bounds: tuple[float, float, float, float], width: int, heig
     return None if raw is None else np.frombuffer(raw, dtype=np.uint8).reshape(height, width, 3)
 
 
+def jpeg_bytes(rgb: np.ndarray, quality: int = 82) -> bytes:
+    """Base images go into the sheet as JPEG: a fraction of the size of PNG for photos and shading."""
+    from io import BytesIO
+
+    from PIL import Image  # installed with cairosvg
+
+    buf = BytesIO()
+    Image.fromarray(np.ascontiguousarray(rgb), "RGB").save(buf, "JPEG", quality=quality, optimize=True)
+    return buf.getvalue()
+
+
 def png_bytes(rgb: np.ndarray) -> bytes:
     import warnings
 
@@ -154,4 +165,4 @@ def png_bytes(rgb: np.ndarray) -> bytes:
         return mem.read()
 
 
-__all__ = ["aerial", "hillshade", "png_bytes", "AERIAL_ATTRIBUTION"]
+__all__ = ["aerial", "hillshade", "jpeg_bytes", "png_bytes", "AERIAL_ATTRIBUTION"]

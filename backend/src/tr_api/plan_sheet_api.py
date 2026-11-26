@@ -108,7 +108,7 @@ def _sheet_input(project_id: UUID, user, settings: dict, dpi: int) -> tuple[Shee
         except Exception:  # noqa: BLE001 - storage trouble: plain base
             log.warning("sheet: terrain shading unavailable", exc_info=True)
     if rgb is not None:
-        inp.base_png, inp.base_bounds, inp.base_credit = basemap.png_bytes(rgb), bounds, credit
+        inp.base_jpeg, inp.base_bounds, inp.base_credit = basemap.jpeg_bytes(rgb), bounds, credit
     return inp, used
 
 
