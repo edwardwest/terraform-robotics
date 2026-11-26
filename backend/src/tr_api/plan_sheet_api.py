@@ -18,7 +18,7 @@ from tr_kb import plan_features as pf
 
 from . import basemap, schemas
 from .auth import CurrentUser
-from .common import _project_or_404, dem_local_path
+from .common import _project_or_404, dem_local_path, terrain_surface
 from .db import execute, fetch_all, fetch_one
 from .master_sheet import SheetFeature, SheetInput, frame_for, pdf_with_base, render
 from .plan_features_api import feature_rows
@@ -61,6 +61,7 @@ def _sheet_input(project_id: UUID, user, settings: dict, dpi: int) -> tuple[Shee
     if boundary is not None and boundary.geom_type != "Polygon":
         boundary = max(getattr(boundary, "geoms", [boundary]), key=lambda g: g.area)
 
+    terrain = fetch_one("SELECT dem_path, dem_crs, job_id, summary FROM terrain_results WHERE project_id = :id", id=str(project_id))
     hidden = set(settings["hidden_categories"])
     phases = settings["phases"]
     rows = [r for r in feature_rows(project_id)
@@ -72,12 +73,32 @@ def _sheet_input(project_id: UUID, user, settings: dict, dpi: int) -> tuple[Shee
                            id=str(project_id), srid=srid):
             geoms[str(g["id"])] = wkb.loads(bytes(g["g"]))
     types = pf.types_by_id()
-    features = [SheetFeature(id=str(r["id"]), type=r["type"], type_label=types[r["type"]]["label"], category=r["category"],
-                             label=r["label"], status=r["status"], build_phase=r["build_phase"], geom=geoms[str(r["id"])],
-                             props=r["props"], plant_count=pf.plant_count(types[r["type"]], r["props"], r["area_m2"], r["length_m"]))
-                for r in rows if str(r["id"]) in geoms]
+    layouts = {}
+    if rows:
+        from .plan_site_api import planting_layout
 
-    terrain = fetch_one("SELECT dem_path, dem_crs, job_id, summary FROM terrain_results WHERE project_id = :id", id=str(project_id))
+        surface = None
+        if terrain and terrain.get("dem_crs") == crs:
+            try:
+                _, surface, _ = terrain_surface(project_id)
+            except Exception:  # noqa: BLE001 - shading and rows on contour just go without
+                log.warning("sheet: terrain surface unavailable", exc_info=True)
+        try:
+            layouts = planting_layout(project_id, srid, surface, [(r, geoms[str(r["id"])]) for r in rows if str(r["id"]) in geoms])
+        except Exception:  # noqa: BLE001 - fall back to the sheet's own grid of symbols
+            log.warning("sheet: planting layout failed", exc_info=True)
+    features = []
+    for r in rows:
+        fid = str(r["id"])
+        if fid not in geoms:
+            continue
+        lay = layouts.get(fid)
+        features.append(SheetFeature(
+            id=fid, type=r["type"], type_label=types[r["type"]]["label"], category=r["category"], label=r["label"],
+            status=r["status"], build_phase=r["build_phase"], geom=geoms[fid], props=r["props"],
+            plant_count=len(lay["layout"].points) if lay else pf.plant_count(types[r["type"]], r["props"], r["area_m2"], r["length_m"]),
+            plant_points=lay["layout"].points if lay else None))
+
     contours = []
     if settings["contours"] and terrain:
         crow = fetch_all(

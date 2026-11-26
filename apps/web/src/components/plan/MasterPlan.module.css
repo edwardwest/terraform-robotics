@@ -319,3 +319,94 @@
   align-items: flex-start;
   gap: 0;
 }
+
+/* Phase 3: drawing modes, zones and sectors, checks */
+.modeChips {
+  display: flex;
+  gap: 4px;
+  padding-right: var(--space-1);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.site {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.zoneGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-1);
+}
+
+.zoneField {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.zoneField :global(.input) {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.windRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px auto;
+  gap: 4px;
+  align-items: center;
+}
+
+.checkList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.check2 {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: var(--space-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--fg-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.check2:hover {
+  border-color: var(--border-strong);
+}
+
+.inlineCheck {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+}
+
+.checkHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  color: var(--fg-1);
+}
+
+.severity {
+  margin-left: auto;
+}
+
+.source {
+  color: var(--fg-3);
+}

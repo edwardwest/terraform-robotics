@@ -311,8 +311,47 @@ export interface PlanFeatureSettings {
   height_m: number;
   roof: Roof;
   capacity_m3: number;
+  /** Planted areas: straight rows, or rows parallel to the contour through the middle of the area. */
+  rows_pattern: "straight" | "contour";
   notes: string;
 }
+
+export interface PlantingSummary { plants: number; rows: number; pattern: "contour" | "straight" | "line" | "point"; note: string | null }
+/** Rows (kind "row") and plants (kind "plant") of planted features, with a summary per feature id. */
+export type PlantingCollection = FeatureCollection<LineString | Point, { feature_id: string; kind: "row" | "plant"; color: string }> & {
+  summary: Record<string, PlantingSummary>;
+};
+
+export interface Wind { label: string; from_deg: number }
+export interface PlanSiteSettings {
+  zone_radii_m: [number, number, number, number];
+  zone_center: string | null;
+  winds: Wind[];
+  fire_from_deg: number | null;
+  show_zones: boolean;
+  show_sectors: boolean;
+}
+export interface SunTimes { rise: number; set: number; noon_altitude: number }
+export interface PlanSite {
+  settings: PlanSiteSettings;
+  center: [number, number] | null;
+  center_source: "house" | "property" | null;
+  sun: { summer: SunTimes | null; winter: SunTimes | null } | null;
+  overlays: FeatureCollection<Polygon, { kind: "zone" | "sun" | "wind" | "fire"; zone?: number; label?: string; season?: string; from_deg?: number }>;
+}
+
+export interface PlanFinding {
+  rule: string;
+  severity: "warning" | "note";
+  title: string;
+  message: string;
+  feature_ids: string[];
+  source: string;
+  measure: { distance_m?: number; drop_m?: number; grade_pct?: number; slope_pct?: number; angle_deg?: number };
+}
+export interface PlanChecks { findings: PlanFinding[]; terrain: boolean }
+
+export interface ContourLine { geometry: LineString; elevation_m: number; length_m: number; end_offset_m: number }
 
 export interface PlanFeatureProps {
   id: string;
@@ -522,6 +561,13 @@ export const api = {
     request<PlanFeature>(`/projects/${id}/plan-features/${fid}`, { method: "PATCH", body: JSON.stringify(body) }),
   deletePlanFeature: (id: string, fid: string) =>
     request<void>(`/projects/${id}/plan-features/${fid}`, { method: "DELETE" }),
+  getPlanting: (id: string) => request<PlantingCollection>(`/projects/${id}/plan-features/planting`),
+  contourLine: (id: string, start: [number, number], end: [number, number]) =>
+    request<ContourLine>(`/projects/${id}/plan-features/contour-line`, { method: "POST", body: JSON.stringify({ start, end }) }),
+  getPlanSite: (id: string) => request<PlanSite>(`/projects/${id}/plan-site`),
+  putPlanSite: (id: string, body: PlanSiteSettings) =>
+    request<PlanSite>(`/projects/${id}/plan-site`, { method: "PUT", body: JSON.stringify(body) }),
+  getPlanChecks: (id: string) => request<PlanChecks>(`/projects/${id}/plan-checks`),
   getPlanSheet: (id: string) => request<PlanSheetSettings>(`/projects/${id}/plan-sheet`),
   putPlanSheet: (id: string, body: PlanSheetSettings) =>
     request<PlanSheetSettings>(`/projects/${id}/plan-sheet`, { method: "PUT", body: JSON.stringify(body) }),

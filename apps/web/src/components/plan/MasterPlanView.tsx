@@ -13,8 +13,8 @@ import {
 } from "terra-draw";
 import { TerraDrawMapLibreGLAdapter } from "terra-draw-maplibre-gl-adapter";
 import {
-  api, type LayerName, type PlanFeature, type PlanFeatureCollection, type PlanFeatureType, type PlanGeometry,
-  type PlanItem, type PlanLibrary, type Project, type TerrainSummary,
+  api, type LayerName, type PlanChecks, type PlanFeature, type PlanFeatureCollection, type PlanFeatureType, type PlanGeometry,
+  type PlanItem, type PlanLibrary, type PlanSite, type PlantingCollection, type Project, type TerrainSummary,
 } from "@/lib/api";
 import { useAssistantPage } from "@/lib/assistant";
 import { announceChange, PROJECT_CHANGED, stepCount, type ProjectChange } from "@/lib/steps";
@@ -22,7 +22,9 @@ import { IconArrowRight, IconX } from "../Icons";
 import type { LayerData } from "../terrain/TerrainMap";
 import tv from "../terrain/TerrainView.module.css";
 import { DesignModeSwitch } from "../design/DesignModeSwitch";
+import { ChecksPanel } from "./ChecksPanel";
 import { FeatureProperties } from "./FeatureProperties";
+import { SitePanel } from "./SitePanel";
 import { formatArea, formatLength } from "./format";
 import styles from "./MasterPlan.module.css";
 
@@ -50,6 +52,12 @@ export function MasterPlanView({ projectId }: { projectId: string }) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
   const [showExisting, setShowExisting] = useState(true);
+  const [planting, setPlanting] = useState<PlantingCollection | null>(null);
+  const [showPlanting, setShowPlanting] = useState(true);
+  const [site, setSite] = useState<PlanSite | null>(null);
+  const [checks, setChecks] = useState<PlanChecks | null>(null);
+  const [lineMode, setLineMode] = useState<"free" | "contour">("free");
+  const [contourStart, setContourStart] = useState<[number, number] | null>(null);
 
   const [map, setMap] = useState<MLMap | null>(null);
   const drawRef = useRef<TerraDraw | null>(null);
@@ -64,6 +72,10 @@ export function MasterPlanView({ projectId }: { projectId: string }) {
     const [fc, p] = await Promise.all([api.listPlanFeatures(projectId), api.getPlan(projectId)]);
     setFeatures(fc);
     setPlan(p);
+    // Layouts, zones (centered on the house) and checks follow the features; they can lag a moment behind.
+    api.getPlanting(projectId).then(setPlanting).catch(() => undefined);
+    api.getPlanSite(projectId).then(setSite).catch(() => undefined);
+    api.getPlanChecks(projectId).then(setChecks).catch(() => undefined);
   }, [projectId]);
 
   useEffect(() => {
@@ -178,23 +190,59 @@ export function MasterPlanView({ projectId }: { projectId: string }) {
     draw.clear();
   }, []);
 
-  const startDraw = (t: PlanFeatureType) => {
+  const hasTerrain = !!summary;
+  const contourActive = !!drawType && drawType.geometry === "line" && lineMode === "contour" && hasTerrain;
+
+  const startDraw = (t: PlanFeatureType, mode: "free" | "contour" = lineMode) => {
     const draw = drawRef.current;
     if (!draw) return;
     resetDraw();
     setEditing(null);
     setSelected(null);
     setError(null);
+    setContourStart(null);
     colorRef.current = (categories.get(t.category)?.color ?? "#ffffff") as Hex;
     setDrawType(t);
+    if (t.geometry === "line" && mode === "contour" && hasTerrain) return; // clicks go to onContourClick
     draw.setMode(DRAW_MODE[t.geometry]);
+  };
+
+  const setLineDrawMode = (mode: "free" | "contour") => {
+    setLineMode(mode);
+    if (drawType) startDraw(drawType, mode);
   };
 
   const cancelDraw = useCallback(() => {
     resetDraw();
     setDrawType(null);
     setEditing(null);
+    setContourStart(null);
   }, [resetDraw]);
+
+  /** Along a contour: the first click starts the line, the second ends it; the line follows the contour between. */
+  const onContourClick = async (lngLat: [number, number]) => {
+    const t = drawTypeRef.current;
+    if (!t || busy) return;
+    if (!contourStart) {
+      setContourStart(lngLat);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const line = await api.contourLine(projectId, contourStart, lngLat);
+      const created = await api.createPlanFeature(projectId, { type: t.id, geometry: line.geometry });
+      await refresh();
+      if (t.intervention) announceChange("plan");
+      setSelected(created.properties.id);
+      setDrawType(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setContourStart(null);
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -310,7 +358,11 @@ export function MasterPlanView({ projectId }: { projectId: string }) {
   }, [all]);
 
   const drawHint = drawType
-    ? drawType.geometry === "point"
+    ? contourActive
+      ? contourStart
+        ? `Now click where the ${drawType.label.toLowerCase()} should end. It follows the contour between.`
+        : `Click where the ${drawType.label.toLowerCase()} should start.`
+      : drawType.geometry === "point"
       ? `Click the map to place the ${drawType.label.toLowerCase()}.`
       : drawType.geometry === "line"
         ? `Click along the ${drawType.label.toLowerCase()}. Click the last point again to finish.`
@@ -395,11 +447,27 @@ export function MasterPlanView({ projectId }: { projectId: string }) {
             selectedPlanFeature={selected}
             onSelectPlanFeature={drawType || editing ? null : onSelectFeature}
             onMapReady={setMap}
+            mapClickActive={contourActive}
+            onMapClick={contourActive ? onContourClick : undefined}
+            pending={contourStart ? [contourStart] : undefined}
+            planting={showPlanting ? (planting as FeatureCollection | null) : null}
+            siteOverlays={site ? {
+              type: "FeatureCollection",
+              features: site.overlays.features.filter((f) =>
+                f.properties.kind === "zone" ? site.settings.show_zones : site.settings.show_sectors),
+            } : null}
           />
           {(drawType || editing) && (
             <div className={styles.drawBar} role="status" aria-live="polite">
               {drawType && (
                 <>
+                  {drawType.geometry === "line" && (
+                    <span className={styles.modeChips}>
+                      <button type="button" className="chip" aria-pressed={!contourActive} onClick={() => setLineDrawMode("free")}>Freehand</button>
+                      <button type="button" className="chip" aria-pressed={contourActive} disabled={!hasTerrain}
+                        title={hasTerrain ? undefined : "Needs a terrain model"} onClick={() => setLineDrawMode("contour")}>Along a contour</button>
+                    </span>
+                  )}
                   <span className={styles.swatch} style={{ background: categories.get(drawType.category)?.color }} aria-hidden="true" />
                   <span className="app-small">{busy ? "Saving." : drawHint}</span>
                   <button type="button" className="btn btn-sm btn-ghost" onClick={cancelDraw}>Cancel</button>
@@ -435,6 +503,9 @@ export function MasterPlanView({ projectId }: { projectId: string }) {
             onEditShape={() => startEditShape(selectedFeature)}
             onClose={() => setSelected(null)}
             editingShape={editing === selectedFeature.properties.id}
+            planting={planting?.summary[selectedFeature.properties.id] ?? null}
+            findings={checks?.findings.filter((f) => f.feature_ids.includes(selectedFeature.properties.id)) ?? []}
+            hasTerrain={hasTerrain}
           />
         ) : (
           <section className={`card ${tv.panel}`} aria-labelledby="layers-title">
@@ -465,8 +536,15 @@ export function MasterPlanView({ projectId }: { projectId: string }) {
               <input type="checkbox" checked={showExisting} onChange={(e) => setShowExisting(e.target.checked)} />
               <span className="app-small">Show existing features</span>
             </label>
+            <label className={styles.check}>
+              <input type="checkbox" checked={showPlanting} onChange={(e) => setShowPlanting(e.target.checked)} />
+              <span className="app-small">Show plant positions (zoom in)</span>
+            </label>
           </section>
         )}
+
+        {!selectedFeature && site && <SitePanel key={site.center_source ?? "none"} projectId={projectId} site={site} onChange={setSite} />}
+        {!selectedFeature && <ChecksPanel checks={checks} onSelect={(id) => setSelected(id)} />}
 
         {!selectedFeature && (
           <section className={`card ${tv.panel}`} aria-labelledby="features-title">

@@ -668,8 +668,8 @@ def point_on_valley_at(surface: Surface, valley: LineString, keypoint: Point, ri
     return None
 
 
-def contour_span(surface: Surface, center: Point, half_length_m: float) -> tuple[tuple[float, float], tuple[float, float]]:
-    """End points of a stretch of the contour through `center`, `half_length_m` either side of it."""
+def contour_line(surface: Surface, center: Point, half_length_m: float) -> LineString:
+    """The contour through `center`, up to `half_length_m` along it either side (shorter where it ends)."""
     from skimage import measure
 
     level = surface.z1(center.x, center.y)
@@ -696,6 +696,13 @@ def contour_span(surface: Surface, center: Point, half_length_m: float) -> tuple
     if best is None:
         raise ValueError("No contour found at that point")
     d = best.project(center)
-    a = best.interpolate(max(d - half_length_m, 0))
-    b = best.interpolate(min(d + half_length_m, best.length))
-    return (a.x, a.y), (b.x, b.y)
+    piece = ops.substring(best, max(d - half_length_m, 0), min(d + half_length_m, best.length))
+    if not isinstance(piece, LineString) or piece.length < 2 * surface.res:
+        raise ValueError("The ground is too flat here to follow a contour")
+    return piece
+
+
+def contour_span(surface: Surface, center: Point, half_length_m: float) -> tuple[tuple[float, float], tuple[float, float]]:
+    """End points of a stretch of the contour through `center`, `half_length_m` either side of it."""
+    line = contour_line(surface, center, half_length_m)
+    return line.coords[0][:2], line.coords[-1][:2]

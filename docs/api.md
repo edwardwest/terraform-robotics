@@ -140,6 +140,18 @@ What a person places on the map. Types, the fixed categories and their map color
 
 Exports include master plan features: GeoJSON (`kind: "plan_feature"`), Shapefile (`plan_points`, `plan_lines`, `plan_areas`), KML (a folder per category, styled in its color) and DXF (a `PLAN_<CATEGORY>` layer per category in use, with labels).
 
+### Terrain-aware tools, zones and sectors, checks
+
+`PlanFeatureProps.rows_pattern` (planted areas): `"straight"` (east-west rows, the default) or `"contour"` (rows parallel to the contour through the middle of the area, as in keyline orchards; needs a terrain model, else straight).
+
+`POST /api/projects/{id}/plan-features/contour-line` with `{ start: [lon, lat], end: [lon, lat] }` → `{ geometry: LineString, elevation_m, length_m, end_offset_m }`: the contour through `start`, to the point on it nearest `end`, clipped to the property. Not saved; the app places it as the line feature being drawn. `409` without a terrain model, `422` when the start is outside the property or the ground is too flat.
+
+`GET /api/projects/{id}/plan-features/planting` → GeoJSON `FeatureCollection` of rows (`kind: "row"`, LineString) and plants (`kind: "plant"`, Point) for planted features with a plant spacing, each with `feature_id` and `color`, plus `summary: { feature_id: { plants, rows, pattern: "contour"|"straight"|"line"|"point", note } }`. Plants on the map are thinned past 4,000 per project; counts are complete. The master plan sheet draws its tree symbols from the same layout.
+
+`GET /api/projects/{id}/plan-site` → `{ settings: PlanSiteSettings, center: [lon, lat] | null, center_source: "house"|"property"|null, sun: { summer, winter: { rise, set, noon_altitude } | null }, overlays: FeatureCollection }`. `PUT` with `PlanSiteSettings` → the same. `PlanSiteSettings`: `{ zone_radii_m: [z1, z2, z3, z4] (rising; default 50, 150, 400, 1,000 ft), zone_center: house feature id | null, winds: [{ label, from_deg }] (up to 4), fire_from_deg | null, show_zones, show_sectors }`. Overlays: zone rings (`kind: "zone"`, `zone` 1–4) around the house (or the middle of the property), and sector wedges (`kind: "sun"|"wind"|"fire"`): the sun's arc from sunrise to sunset at each solstice (computed from the latitude), 45° per wind and 60° for fire, from the direction given. Bearings are degrees clockwise from north.
+
+`GET /api/projects/{id}/plan-checks` → `{ findings: [{ rule, severity: "warning"|"note", title, message, feature_ids[], source, measure }], terrain }`, warnings first. Rules (`tr_kb.plan_checks`): features outside the property; earthworks within 3 m of the property line; animal enclosures within 100 ft of a well (DWR Bulletins 74-81/74-90); manure or compost uphill of a pond, creek, rain garden or well (terrain), or merely close (no terrain); ponds on ground averaging over 15% slope; roads over 16% grade (14 CCR 1273.03) and paths over 20%; plants within 5 ft of a building and woodland within 30 ft of the house (CAL FIRE zones 0 and 1); no defensible space drawn around a house; kitchen gardens and compost over 200 ft from the house or garden; windbreaks within 45° of a set wind. `measure` holds metric values (`distance_m`, `drop_m`, `grade_pct`, `slope_pct`, `angle_deg`). Guidance, not approvals.
+
 ## Master plan sheet
 
 An illustrated, print-ready plan of the master plan features (`tr_api.master_sheet`, one SVG renderer for both the preview and the PDF).

@@ -413,6 +413,7 @@ class PlanFeatureProps(BaseModel):
     height_m: float | None = Field(default=None, gt=0, le=80)
     roof: Literal["gable", "hip", "shed", "flat"] | None = None
     capacity_m3: float | None = Field(default=None, ge=0, le=100000)
+    rows_pattern: Literal["straight", "contour"] | None = None  # planted areas: straight rows or rows on contour
     notes: str | None = Field(default=None, max_length=1000)
 
 
@@ -495,3 +496,36 @@ class PlanSheetSettings(BaseModel):
             if len(key) > 120 or not (0 <= x <= 1 and 0 <= y <= 1):
                 raise ValueError("Label positions are fractions of the sheet, from 0 to 1")
         return v
+
+
+# ---- Master plan site: zones, sectors, contour lines, checks ----------------------------------------
+
+
+class Wind(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    label: str = Field(default="Prevailing wind", max_length=40)
+    from_deg: float = Field(ge=0, lt=360)  # the direction the wind comes FROM, degrees clockwise from north
+
+
+class PlanSiteSettings(BaseModel):
+    """Zones 1-4 (distance out from the house, metres), winds and fire direction, and which overlays the map shows."""
+    model_config = ConfigDict(extra="forbid")
+    # 50, 150, 400 and 1,000 ft
+    zone_radii_m: list[float] = Field(default_factory=lambda: [15.24, 45.72, 121.92, 304.8], min_length=4, max_length=4)
+    zone_center: str | None = None  # a house feature id; None: the first house, else the middle of the property
+    winds: list[Wind] = Field(default_factory=list, max_length=4)
+    fire_from_deg: float | None = Field(default=None, ge=0, lt=360)
+    show_zones: bool = False
+    show_sectors: bool = False
+
+    @field_validator("zone_radii_m")
+    @classmethod
+    def _rising(cls, v: list[float]) -> list[float]:
+        if any(r <= 0 or r > 5000 for r in v) or any(b <= a for a, b in zip(v, v[1:])):
+            raise ValueError("Zone distances must rise from zone 1 to zone 4, each up to 5,000 m")
+        return v
+
+
+class ContourLineRequest(BaseModel):
+    start: tuple[float, float]  # lon, lat
+    end: tuple[float, float]
